@@ -182,7 +182,7 @@ def test_gemini_es_el_proveedor_por_defecto_y_valida_el_esquema(con_gemini):
     cliente, llamada = _gemini_falso(factura_epe().model_dump_json())
     f = extraer_factura(b"%PDF-1.4", "application/pdf", cliente)
     assert f.cliente_razon_social.valor == "SCIMACA S R L"
-    assert llamada.kwargs["model"] == "gemini-3.8-flash"
+    assert llamada.kwargs["model"] == "gemini-3.5-flash"
     config = llamada.kwargs["config"]
     assert config.response_mime_type == "application/json"
     assert config.response_json_schema == FacturaExtraida.model_json_schema()
@@ -201,7 +201,7 @@ def test_gemini_errores(con_gemini):
     from google.genai import errors
 
     cuota = errors.ClientError(429, {"error": {"code": 429, "message": "Quota exceeded", "status": "RESOURCE_EXHAUSTED"}})
-    with pytest.raises(ExtraccionFallida, match="límite"):
+    with pytest.raises(ExtraccionFallida, match="por minuto"):
         extraer_factura(b"%PDF", "application/pdf", _gemini_falso(error=cuota)[0])
     key = errors.ClientError(400, {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT",
                                              "details": [{"reason": "API_KEY_INVALID"}]}})
@@ -217,12 +217,15 @@ def test_gemini_errores(con_gemini):
 
 
 def _hay_credenciales() -> bool:
+    # Optativos: consumen el cupo del proveedor (en Gemini gratis es chico). Correr con PRUEBAS_API_REAL=1.
+    if os.environ.get("PRUEBAS_API_REAL") != "1":
+        return False
     if os.environ.get("EXTRACCION_PROVEEDOR", "gemini").lower() == "claude":
         return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
     return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
 
 
-hay_credenciales = pytest.mark.skipif(not _hay_credenciales(), reason="Sin API key del proveedor de extracción")
+hay_credenciales = pytest.mark.skipif(not _hay_credenciales(), reason="Pruebas con la API real: PRUEBAS_API_REAL=1 y API key")
 
 
 @hay_credenciales
@@ -239,3 +242,41 @@ def test_extraccion_real_edenor_escaneada():
     f = extraer_factura((EJEMPLOS / "edenor Santamaria vto 24-08-26.pdf").read_bytes(), "application/pdf")
     assert f.tipo_documento == TipoDocumento.DISTRIBUIDORA
     assert f.kwh_total.valor or f.kwh_resto.valor
+
+
+def test_gemini_pasa_al_modelo_de_respaldo_si_esta_sobrecargado(con_gemini):
+    from google.genai import errors
+
+    usados = []
+
+    def generate_content(**kwargs):
+        usados.append(kwargs["model"])
+        if kwargs["model"] == "gemini-3.5-flash":
+            raise errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
+        return SimpleNamespace(text=factura_epe().model_dump_json(), candidates=[SimpleNamespace(finish_reason="STOP")])
+
+    cliente = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    assert extraer_factura(b"%PDF", "application/pdf", cliente).cliente_razon_social.valor == "SCIMACA S R L"
+    assert usados == ["gemini-3.5-flash", "gemini-3.1-flash-lite"]
+
+    def siempre_503(**kwargs):
+        raise errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
+
+    with pytest.raises(ExtraccionFallida, match="todos los modelos"):
+        extraer_factura(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=siempre_503)))
+
+
+def test_gemini_cupo_diario_agotado_pasa_al_respaldo(con_gemini):
+    from google.genai import errors
+
+    usados = []
+    diario = {"error": {"code": 429, "message": "Quota exceeded", "status": "RESOURCE_EXHAUSTED",
+                        "details": [{"violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}
+
+    def generate_content(**kwargs):
+        usados.append(kwargs["model"])
+        raise errors.ClientError(429, diario)
+
+    with pytest.raises(ExtraccionFallida, match="cupo diario"):
+        extraer_factura(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
+    assert usados == ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]

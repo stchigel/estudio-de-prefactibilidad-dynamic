@@ -89,7 +89,7 @@ consumos se cargan a mano.
 |---|---|
 | `EXTRACCION_PROVEEDOR` | `gemini` (por defecto) o `claude` |
 | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Key del proveedor elegido |
-| `EXTRACCION_MODELO` | Forzar un modelo (por defecto `gemini-3.8-flash` / `claude-sonnet-5-5`) |
+| `EXTRACCION_MODELO` | Forzar un modelo (por defecto `gemini-3.5-flash` / `claude-sonnet-5-5`) |
 | `EXTRACCION_ESFUERZO` | Solo Claude: `low` (por defecto) / `medium` / `high` |
 
 En el frontend, `NEXT_PUBLIC_API_URL` permite apuntar a un backend que no esté en

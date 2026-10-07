@@ -14,11 +14,17 @@ Proveedor según EXTRACCION_PROVEEDOR:
 from __future__ import annotations
 
 import base64
+import logging
 import os
 
 from .esquema import FacturaExtraida
 
-MODELOS_POR_DEFECTO = {"gemini": "gemini-3.8-flash", "claude": "claude-sonnet-5-5"}
+logger = logging.getLogger(__name__)
+
+MODELOS_POR_DEFECTO = {"gemini": "gemini-3.5-flash", "claude": "claude-sonnet-5-5"}
+# Si el modelo de Gemini está sobrecargado o agotó su cupo diario gratuito (cada modelo
+# tiene el suyo, p. ej. 20 pedidos/día en gemini-3.8-flash), se prueban estos.
+RESPALDOS_GEMINI = ["gemini-3.1-flash-lite", "gemini-3.8-flash"]
 
 
 # Se leen en cada llamada para respetar el .env cargado al iniciar la API.
@@ -99,8 +105,14 @@ def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> Fact
     from google import genai
     from google.genai import errors, types
 
+    # El plan gratuito responde seguido 503 (sobrecarga): se reintenta con espera creciente
+    # (2 y 4 s) y después se pasa al modelo de respaldo. Los 429 no se reintentan: cada
+    # intento consume el cupo diario.
+    reintentos = types.HttpOptions(
+        retry_options=types.HttpRetryOptions(attempts=3, initial_delay=2, max_delay=10, http_status_codes=[500, 502, 503, 504])
+    )
     try:
-        cliente = cliente or genai.Client()  # lee GEMINI_API_KEY
+        cliente = cliente or genai.Client(http_options=reintentos)  # lee GEMINI_API_KEY
     except ValueError as exc:
         raise ExtraccionNoConfigurada("Falta configurar GEMINI_API_KEY") from exc
 
@@ -109,24 +121,39 @@ def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> Fact
         mime_type=media_type,
         media_resolution=types.PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH,  # letra chica de las facturas
     )
-    try:
-        respuesta = cliente.models.generate_content(
-            model=modelo(),
-            contents=[documento, PEDIDO],
-            config=types.GenerateContentConfig(
-                system_instruction=INSTRUCCIONES,
-                response_mime_type="application/json",
-                response_json_schema=FacturaExtraida.model_json_schema(),
-            ),
-        )
-    except errors.ClientError as exc:
-        if exc.code in (401, 403) or "API_KEY" in str(exc):
-            raise ExtraccionNoConfigurada("La API key de Gemini es inválida") from exc
-        if exc.code == 429:
-            raise ExtraccionFallida("Se alcanzó el límite del plan gratuito de Gemini; esperar un minuto y reintentar") from exc
-        raise ExtraccionFallida(f"Error de la API de Gemini ({exc.code}): {exc.message}") from exc
-    except errors.ServerError as exc:
-        raise ExtraccionFallida(f"Gemini no está disponible ({exc.code}); reintentar") from exc
+    modelos = [modelo()] + [m for m in RESPALDOS_GEMINI if m != modelo()]
+    for i, nombre in enumerate(modelos):
+        try:
+            respuesta = cliente.models.generate_content(
+                model=nombre,
+                contents=[documento, PEDIDO],
+                config=types.GenerateContentConfig(
+                    system_instruction=INSTRUCCIONES,
+                    response_mime_type="application/json",
+                    response_json_schema=FacturaExtraida.model_json_schema(),
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),  # no usa herramientas
+                ),
+            )
+            break
+        except errors.ClientError as exc:
+            if exc.code in (401, 403) or "API_KEY" in str(exc):
+                raise ExtraccionNoConfigurada("La API key de Gemini es inválida") from exc
+            if exc.code != 429:
+                raise ExtraccionFallida(f"Error de la API de Gemini ({exc.code}): {exc.message}") from exc
+            por_dia = "PerDay" in str(exc)
+            if i == len(modelos) - 1:
+                raise ExtraccionFallida(
+                    "Se agotó el cupo diario gratuito de Gemini en todos los modelos; se renueva en unas horas"
+                    if por_dia
+                    else "Se alcanzó el límite por minuto del plan gratuito de Gemini; esperar un minuto y reintentar"
+                ) from exc
+            logger.warning("Gemini %s: límite %s alcanzado; se prueba %s", nombre, "diario" if por_dia else "por minuto", modelos[i + 1])
+        except errors.ServerError as exc:
+            if i == len(modelos) - 1:
+                raise ExtraccionFallida(
+                    f"Gemini está sobrecargado ({exc.code}) en todos los modelos gratuitos; reintentar en unos minutos"
+                ) from exc
+            logger.warning("Gemini %s sobrecargado (%s); se prueba %s", nombre, exc.code, modelos[i + 1])
 
     candidatos = respuesta.candidates or []
     fin = str(getattr(candidatos[0], "finish_reason", "") or "") if candidatos else ""
