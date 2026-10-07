@@ -428,16 +428,30 @@ Imágenes no generables (logo, foto planta, foto montaje): carga opcional; si fa
 
 ---
 
-## 14. Pendientes y puntos a confirmar
+## 14. Pendientes
+
+### 14.1 Pendientes de contenido / alcance
 
 | # | Tema | Estado |
 |---|---|---|
 | 1 | Plantilla PPT con m² en "La oportunidad detectada" | El usuario la enviará |
 | 2 | Contenido de financiación bancaria (CFI) | Sin definir; diapositiva opcional |
 | 3 | Facturas GUME (CAMMESA + generadora) | Fuera de alcance hasta tener un caso real |
-| 4 | `Hoja1!J22`: el adicional por inversor del **kit 2** se busca con el kWp del **kit 1** (`MATCH($E$20,…)`) | El usuario consulta y responde |
-| 5 | ~~Baterías reducen inyección con ON GRID~~ | Resuelto (§6.2, §6.10 #4) |
-| 6 | `BAT!N1` solo reconoce modelos High Voltage; Low Voltage devuelve FALSO (capacidad 0) | El usuario consulta y responde |
-| 7 | Ahorro por baterías: `PERFIL DE CONSUMO!X20` divide por `V30` (vacía) → #DIV/0! con cualquier dato; además el total `T26` suma `V24` (vacía), no `X20`. Nunca se suma al ahorro | A confirmar si es una función sin terminar y cómo debería calcularse |
-| 8 | Potencia contratada: con pico y fuera de pico distintos, ¿cuál se usa en L7? | A confirmar |
-| 9 | `Hoja1!R9` (Pot Contr kW, bloque CAMMESA) no se usa en fórmulas | A confirmar |
+
+### 14.2 Ajustes a futuro del cálculo (consultados al equipo, sin respuesta)
+
+No bloquean el desarrollo. **Hasta que haya respuesta, se implementa el comportamiento indicado** (igual al Excel salvo #A4). Cada uno debe quedar aislado en el motor (una función o parámetro) para poder cambiarlo sin tocar el resto, y cubierto por un test que documente el comportamiento actual.
+
+| # | Tema | Comportamiento provisorio | Posible ajuste futuro |
+|---|---|---|---|
+| A1 | `Hoja1!J22`: el adicional por inversor del **kit 2** se busca con el kWp del **kit 1** (`MATCH($E$20,…)`) | Replicar el Excel: kit 2 usa el adicional del tamaño del kit 1 | Usar el adicional del tamaño del propio kit 2 |
+| A2 | `BAT!N1` solo reconoce baterías High Voltage; Low Voltage → capacidad 0 | Replicar el Excel: Low Voltage con capacidad 0 para el cálculo de inyección (su costo sí se suma) | Usar su capacidad real (5,12 / 16 kWh) o quitarlas del catálogo |
+| A3 | Ahorro por baterías: `PERFIL DE CONSUMO!X20` divide por `V30` (vacía) y `T26` suma `V24` (vacía) → nunca se suma | Ahorro por baterías = 0 | Definir fórmula (energía almacenada × precio, pico evitado, cortes) |
+| A4 | Potencia contratada (L7) cuando la factura trae pico y fuera de pico distintas | Precargar la **mayor** de las dos, mostrando ambas en la revisión; editable | Regla que defina el equipo (pico / fuera de pico / mayor) |
+| A5 | `Hoja1!R9` (Pot Contr kW, bloque CAMMESA) no se usa en fórmulas | Campo opcional, se guarda y se exporta al Excel, sin efecto en cálculos | Eliminarlo o incorporarlo (posiblemente GUME) |
+
+### 14.3 Resueltos
+
+| Tema | Resolución |
+|---|---|
+| Baterías reducen inyección con ON GRID / baterías = NO | §6.2 y §6.10 #4 |
