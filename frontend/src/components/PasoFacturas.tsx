@@ -40,7 +40,7 @@ export function PasoFacturas({
       const err = e as ErrorApi;
       setError(
         err.estado === 503
-          ? "La extracción automática todavía no está configurada (falta la API key de Claude). Podés seguir y cargar los consumos a mano."
+          ? `La lectura automática no está configurada: ${err.message}. Podés seguir y cargar los consumos a mano.`
           : err.message,
       );
     } finally {

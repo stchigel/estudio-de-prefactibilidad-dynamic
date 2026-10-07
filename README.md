@@ -5,14 +5,14 @@ Especificación: [docs/especificacion.md](docs/especificacion.md) · pendientes 
 
 | Carpeta | Contenido |
 |---|---|
-| [backend/](backend/) | Motor de cálculo (réplica validada de la planilla), búsqueda de opciones, extracción de facturas con Claude, exportes Excel/PowerPoint y API (FastAPI) |
+| [backend/](backend/) | Motor de cálculo (réplica validada de la planilla), búsqueda de opciones, lectura de facturas con IA (Gemini o Claude), exportes Excel/PowerPoint y API (FastAPI) |
 | [frontend/](frontend/) | Asistente web (Next.js): facturas → consumos → proyecto → opciones → resultados |
 
 ## Requisitos
 
 - Python 3.12 o superior
 - Node.js 20 o superior (probado con 24 LTS)
-- Opcional: API key de Anthropic para leer facturas automáticamente
+- Opcional: API key de Gemini (pruebas) o de Anthropic (producción) para leer facturas automáticamente
 
 ## Primera vez
 
@@ -54,30 +54,46 @@ http://localhost:8000/docs.
 
 ### Lectura automática de facturas
 
-Necesita la variable de entorno `ANTHROPIC_API_KEY` en la terminal del backend
-**antes** de iniciarlo:
+La lectura de facturas con IA se configura en el archivo **`backend/.env`** (no se sube
+al repositorio). Si no existe, copiar `backend/.env.example` como `backend/.env`.
 
-```powershell
-# PowerShell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
+**Para pruebas: Gemini (gratis)**
+
+1. Entrar a https://aistudio.google.com/apikey con una cuenta de Google.
+2. "Create API key" → copiar la key.
+3. Pegarla en `backend/.env`:
+
+   ```
+   EXTRACCION_PROVEEDOR=gemini
+   GEMINI_API_KEY=la-key-copiada
+   ```
+
+4. Reiniciar el backend (terminal 1: Ctrl+C y volver a iniciarlo).
+
+> En el plan gratuito Google usa el contenido enviado para mejorar sus productos.
+> Sirve para probar; para facturas reales de clientes en producción usar Claude.
+
+**Para producción: Claude**
+
+```
+EXTRACCION_PROVEEDOR=claude
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-```bash
-# Git Bash / Linux / Mac
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
+Sin key la aplicación funciona igual: avisa que la lectura no está configurada y los
+consumos se cargan a mano.
 
-Sin la key la aplicación funciona igual: avisa que la extracción no está configurada
-y los consumos se cargan a mano.
+### Configuración opcional (`backend/.env`)
 
-### Configuración opcional
+| Variable | Para qué |
+|---|---|
+| `EXTRACCION_PROVEEDOR` | `gemini` (por defecto) o `claude` |
+| `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Key del proveedor elegido |
+| `EXTRACCION_MODELO` | Forzar un modelo (por defecto `gemini-3.8-flash` / `claude-sonnet-5-5`) |
+| `EXTRACCION_ESFUERZO` | Solo Claude: `low` (por defecto) / `medium` / `high` |
 
-| Variable | Dónde | Para qué |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | backend | Extracción de facturas |
-| `EXTRACCION_MODELO` | backend | Modelo de Claude (por defecto `claude-opus-5-5`) |
-| `EXTRACCION_ESFUERZO` | backend | `low` / `medium` / `high` (por defecto `high`) |
-| `NEXT_PUBLIC_API_URL` | frontend | URL del backend si no es `http://localhost:8000` |
+En el frontend, `NEXT_PUBLIC_API_URL` permite apuntar a un backend que no esté en
+`http://localhost:8000`.
 
 ## Tests
 

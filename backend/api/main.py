@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,9 @@ from motor.modelos import (
 from motor.opciones import buscar_opciones
 from motor.serializacion import a_dict
 from motor.validaciones import sugerir_pdu_rack, validar
+
+# Configuración local (API keys, proveedor de IA): backend/.env, ver .env.example.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="Prefactibilidad Solar — Dynamic Energy", version="0.1.0")
 app.add_middleware(

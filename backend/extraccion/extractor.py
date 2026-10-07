@@ -1,10 +1,14 @@
-"""Extracción de facturas con Claude (§5.2).
+"""Extracción de facturas con IA (§5.2).
 
-Se manda el documento tal cual: los PDF con texto y los escaneados van como
-bloque `document` (Claude lee también las páginas como imagen) y las fotos
-como bloque `image`. La salida se valida contra FacturaExtraida.
+El documento se manda tal cual (PDF con texto, PDF escaneado o foto) y la
+salida se valida contra FacturaExtraida.
 
-Credenciales: variable de entorno ANTHROPIC_API_KEY (o `ant auth login`).
+Proveedor según EXTRACCION_PROVEEDOR:
+  - "gemini" (por defecto, para pruebas): plan gratuito de Google AI Studio.
+    Credencial: GEMINI_API_KEY. Ojo: en el plan gratis Google usa el contenido
+    para mejorar sus productos; no usarlo con datos sensibles en producción.
+  - "claude": API de Anthropic, recomendado para producción.
+    Credencial: ANTHROPIC_API_KEY (o `ant auth login`).
 """
 
 from __future__ import annotations
@@ -12,12 +16,22 @@ from __future__ import annotations
 import base64
 import os
 
-import anthropic
-
 from .esquema import FacturaExtraida
 
-MODELO = os.environ.get("EXTRACCION_MODELO", "claude-opus-5-5")
-ESFUERZO = os.environ.get("EXTRACCION_ESFUERZO", "high")
+MODELOS_POR_DEFECTO = {"gemini": "gemini-3.8-flash", "claude": "claude-sonnet-5-5"}
+
+
+# Se leen en cada llamada para respetar el .env cargado al iniciar la API.
+def proveedor() -> str:
+    return os.environ.get("EXTRACCION_PROVEEDOR", "gemini").strip().lower()
+
+
+def modelo() -> str:
+    return os.environ.get("EXTRACCION_MODELO") or MODELOS_POR_DEFECTO.get(proveedor(), "")
+
+
+def esfuerzo() -> str:  # solo Claude
+    return os.environ.get("EXTRACCION_ESFUERZO", "low")
 
 TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 TIPO_PDF = "application/pdf"
@@ -47,39 +61,104 @@ estimá cada barra con la escala del eje, marcá leido_de_grafico=true y confian
 - tipo_documento: factura de distribuidora, de CAMMESA, de generadora (contratos \
 MAT/GUME) u otro documento.
 """
+PEDIDO = "Extraé los datos de esta factura."
 
 
 class ExtraccionNoConfigurada(RuntimeError):
-    """No hay credenciales de Anthropic configuradas."""
+    """No hay credenciales del proveedor de IA configuradas."""
 
 
 class ExtraccionFallida(RuntimeError):
     pass
 
 
-def _bloque_documento(contenido: bytes, media_type: str) -> dict:
+def _validar_tipo(media_type: str) -> None:
+    if media_type != TIPO_PDF and media_type not in TIPOS_IMAGEN:
+        raise ValueError(f"Tipo de archivo no soportado: {media_type}. Usar PDF, JPG o PNG.")
+
+
+def extraer_factura(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
+    """Extrae los datos de una factura con el proveedor configurado.
+
+    `cliente` permite inyectar el cliente del SDK (tests).
+    """
+    _validar_tipo(media_type)
+    match proveedor():
+        case "gemini":
+            return _extraer_con_gemini(contenido, media_type, cliente)
+        case "claude":
+            return _extraer_con_claude(contenido, media_type, cliente)
+        case otro:
+            raise ExtraccionNoConfigurada(f"EXTRACCION_PROVEEDOR desconocido: {otro!r} (usar 'gemini' o 'claude')")
+
+
+# ------------------------------------------------------------------ Gemini
+
+
+def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
+    from google import genai
+    from google.genai import errors, types
+
+    try:
+        cliente = cliente or genai.Client()  # lee GEMINI_API_KEY
+    except ValueError as exc:
+        raise ExtraccionNoConfigurada("Falta configurar GEMINI_API_KEY") from exc
+
+    documento = types.Part.from_bytes(
+        data=contenido,
+        mime_type=media_type,
+        media_resolution=types.PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH,  # letra chica de las facturas
+    )
+    try:
+        respuesta = cliente.models.generate_content(
+            model=modelo(),
+            contents=[documento, PEDIDO],
+            config=types.GenerateContentConfig(
+                system_instruction=INSTRUCCIONES,
+                response_mime_type="application/json",
+                response_json_schema=FacturaExtraida.model_json_schema(),
+            ),
+        )
+    except errors.ClientError as exc:
+        if exc.code in (401, 403) or "API_KEY" in str(exc):
+            raise ExtraccionNoConfigurada("La API key de Gemini es inválida") from exc
+        if exc.code == 429:
+            raise ExtraccionFallida("Se alcanzó el límite del plan gratuito de Gemini; esperar un minuto y reintentar") from exc
+        raise ExtraccionFallida(f"Error de la API de Gemini ({exc.code}): {exc.message}") from exc
+    except errors.ServerError as exc:
+        raise ExtraccionFallida(f"Gemini no está disponible ({exc.code}); reintentar") from exc
+
+    candidatos = respuesta.candidates or []
+    fin = str(getattr(candidatos[0], "finish_reason", "") or "") if candidatos else ""
+    if "MAX_TOKENS" in fin:
+        raise ExtraccionFallida("La respuesta quedó incompleta; reintentar")
+    if not respuesta.text:
+        raise ExtraccionFallida(f"Gemini no devolvió datos ({fin or 'sin respuesta'})")
+    try:
+        return FacturaExtraida.model_validate_json(respuesta.text)
+    except ValueError as exc:
+        raise ExtraccionFallida("La respuesta de Gemini no respeta el formato esperado; reintentar") from exc
+
+
+# ------------------------------------------------------------------ Claude (desactivado para pruebas)
+
+
+def _extraer_con_claude(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
+    import anthropic
+
     datos = base64.standard_b64encode(contenido).decode("ascii")
-    if media_type == TIPO_PDF:
-        return {"type": "document", "source": {"type": "base64", "media_type": TIPO_PDF, "data": datos}}
-    if media_type in TIPOS_IMAGEN:
-        return {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": datos}}
-    raise ValueError(f"Tipo de archivo no soportado: {media_type}. Usar PDF, JPG o PNG.")
-
-
-def extraer_factura(
-    contenido: bytes, media_type: str, cliente: anthropic.Anthropic | None = None
-) -> FacturaExtraida:
-    bloque = _bloque_documento(contenido, media_type)
+    tipo_bloque = "document" if media_type == TIPO_PDF else "image"
+    bloque = {"type": tipo_bloque, "source": {"type": "base64", "media_type": media_type, "data": datos}}
     cliente = cliente or anthropic.Anthropic()
     try:
         respuesta = cliente.beta.messages.parse(
-            model=MODELO,
+            model=modelo(),
             max_tokens=16000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
-            output_config={"effort": ESFUERZO},
+            output_config={"effort": esfuerzo()},
             system=INSTRUCCIONES,
-            messages=[{"role": "user", "content": [bloque, {"type": "text", "text": "Extraé los datos de esta factura."}]}],
+            messages=[{"role": "user", "content": [bloque, {"type": "text", "text": PEDIDO}]}],
             output_format=FacturaExtraida,
         )
     except anthropic.AuthenticationError as exc:

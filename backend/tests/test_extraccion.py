@@ -119,12 +119,18 @@ def _cliente_falso(respuesta=None, error=None):
     return SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(parse=parse))), parse
 
 
-def test_extraer_envia_pdf_e_imagen():
+@pytest.fixture
+def con_claude(monkeypatch):
+    monkeypatch.setenv("EXTRACCION_PROVEEDOR", "claude")
+
+
+def test_claude_envia_pdf_e_imagen(con_claude):
     cliente, parse = _cliente_falso(SimpleNamespace(stop_reason="end_turn", parsed_output=factura_epe()))
     assert extraer_factura(b"%PDF-1.4", "application/pdf", cliente).cliente_razon_social.valor == "SCIMACA S R L"
     bloque = parse.kwargs["messages"][0]["content"][0]
     assert bloque["type"] == "document" and bloque["source"]["media_type"] == "application/pdf"
     assert parse.kwargs["output_format"] is FacturaExtraida
+    assert parse.kwargs["model"] == "claude-sonnet-5-5"
     extraer_factura(b"\xff\xd8", "image/jpeg", cliente)
     assert parse.kwargs["messages"][0]["content"][0]["type"] == "image"
 
@@ -134,23 +140,89 @@ def test_tipo_no_soportado():
         extraer_factura(b"x", "application/zip", _cliente_falso()[0])
 
 
-def test_sin_credenciales():
+def test_claude_sin_credenciales(con_claude):
     error = TypeError("Could not resolve authentication method. Expected one of api_key...")
     with pytest.raises(ExtraccionNoConfigurada):
         extraer_factura(b"%PDF", "application/pdf", _cliente_falso(error=error)[0])
 
 
-def test_rechazo_o_respuesta_incompleta():
+def test_claude_rechazo_o_respuesta_incompleta(con_claude):
     for r in (SimpleNamespace(stop_reason="refusal", parsed_output=None),
               SimpleNamespace(stop_reason="max_tokens", parsed_output=None)):
         with pytest.raises(ExtraccionFallida):
             extraer_factura(b"%PDF", "application/pdf", _cliente_falso(r)[0])
 
 
-hay_credenciales = pytest.mark.skipif(
-    not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")),
-    reason="Sin credenciales de Anthropic",
-)
+def test_proveedor_desconocido(monkeypatch):
+    monkeypatch.setenv("EXTRACCION_PROVEEDOR", "otro")
+    with pytest.raises(ExtraccionNoConfigurada):
+        extraer_factura(b"%PDF", "application/pdf", _cliente_falso()[0])
+
+
+# ------------------------------------------------------------------ Gemini (proveedor por defecto)
+
+
+def _gemini_falso(texto=None, error=None, fin="STOP"):
+    def generate_content(**kwargs):
+        generate_content.kwargs = kwargs
+        if error:
+            raise error
+        return SimpleNamespace(text=texto, candidates=[SimpleNamespace(finish_reason=fin)])
+
+    return SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)), generate_content
+
+
+@pytest.fixture
+def con_gemini(monkeypatch):
+    monkeypatch.delenv("EXTRACCION_PROVEEDOR", raising=False)
+    monkeypatch.delenv("EXTRACCION_MODELO", raising=False)
+
+
+def test_gemini_es_el_proveedor_por_defecto_y_valida_el_esquema(con_gemini):
+    cliente, llamada = _gemini_falso(factura_epe().model_dump_json())
+    f = extraer_factura(b"%PDF-1.4", "application/pdf", cliente)
+    assert f.cliente_razon_social.valor == "SCIMACA S R L"
+    assert llamada.kwargs["model"] == "gemini-3.8-flash"
+    config = llamada.kwargs["config"]
+    assert config.response_mime_type == "application/json"
+    assert config.response_json_schema == FacturaExtraida.model_json_schema()
+    documento = llamada.kwargs["contents"][0]
+    assert documento.inline_data.mime_type == "application/pdf"
+
+
+def test_gemini_sin_key(con_gemini, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    with pytest.raises(ExtraccionNoConfigurada, match="GEMINI_API_KEY"):
+        extraer_factura(b"%PDF", "application/pdf")
+
+
+def test_gemini_errores(con_gemini):
+    from google.genai import errors
+
+    cuota = errors.ClientError(429, {"error": {"code": 429, "message": "Quota exceeded", "status": "RESOURCE_EXHAUSTED"}})
+    with pytest.raises(ExtraccionFallida, match="límite"):
+        extraer_factura(b"%PDF", "application/pdf", _gemini_falso(error=cuota)[0])
+    key = errors.ClientError(400, {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT",
+                                             "details": [{"reason": "API_KEY_INVALID"}]}})
+    with pytest.raises(ExtraccionNoConfigurada):
+        extraer_factura(b"%PDF", "application/pdf", _gemini_falso(error=key)[0])
+    with pytest.raises(ExtraccionFallida, match="incompleta"):
+        extraer_factura(b"%PDF", "application/pdf", _gemini_falso("{", fin="MAX_TOKENS")[0])
+    with pytest.raises(ExtraccionFallida, match="formato"):
+        extraer_factura(b"%PDF", "application/pdf", _gemini_falso('{"tipo_documento": "x"}')[0])
+
+
+# ------------------------------------------------------------------ con la API real (solo si hay key)
+
+
+def _hay_credenciales() -> bool:
+    if os.environ.get("EXTRACCION_PROVEEDOR", "gemini").lower() == "claude":
+        return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+
+
+hay_credenciales = pytest.mark.skipif(not _hay_credenciales(), reason="Sin API key del proveedor de extracción")
 
 
 @hay_credenciales
