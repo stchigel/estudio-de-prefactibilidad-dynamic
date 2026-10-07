@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* Tokens: superficies, tintas y series (paleta categórica validada, modo claro/oscuro). */
+:root {
+  color-scheme: light;
+  --plano: #f9f9f7;
+  --superficie: #fcfcfb;
+  --tinta: #0b0b0b;
+  --tinta-2: #52514e;
+  --tenue: #898781;
+  --borde: #e1e0d9;
+  --eje: #c3c2b7;
+  --acento: #2a78d6;
+  --acento-fuerte: #1c5cab;
+  --serie-1: #2a78d6; /* azul: consumo / pagos */
+  --serie-2: #eb6834; /* naranja: generación / ahorros */
+  --bueno: #0ca30c;
+  --bueno-texto: #006300;
+  --advertencia: #fab219;
+  --critico: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plano: #0d0d0d;
+    --superficie: #1a1a19;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tenue: #898781;
+    --borde: #2c2c2a;
+    --eje: #383835;
+    --acento: #3987e5;
+    --acento-fuerte: #6da7ec;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --bueno-texto: #0ca30c;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plano: #0d0d0d;
+  --superficie: #1a1a19;
+  --tinta: #ffffff;
+  --tinta-2: #c3c2b7;
+  --tenue: #898781;
+  --borde: #2c2c2a;
+  --eje: #383835;
+  --acento: #3987e5;
+  --acento-fuerte: #6da7ec;
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --bueno-texto: #0ca30c;
+}
+
+@theme inline {
+  --color-plano: var(--plano);
+  --color-superficie: var(--superficie);
+  --color-tinta: var(--tinta);
+  --color-tinta-2: var(--tinta-2);
+  --color-tenue: var(--tenue);
+  --color-borde: var(--borde);
+  --color-eje: var(--eje);
+  --color-acento: var(--acento);
+  --color-acento-fuerte: var(--acento-fuerte);
+  --color-serie-1: var(--serie-1);
+  --color-serie-2: var(--serie-2);
+  --color-bueno: var(--bueno);
+  --color-bueno-texto: var(--bueno-texto);
+  --color-advertencia: var(--advertencia);
+  --color-critico: var(--critico);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--plano);
+  color: var(--tinta);
+  font-family: var(--font-sans);
+}

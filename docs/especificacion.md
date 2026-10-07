@@ -163,7 +163,7 @@ Réplica de las hojas `Hoja1`, `PERFIL DE CONSUMO`, `BAT`, `ROI`, `VAN TIR`, `Fi
 | | Comisión / gastos % | R28 | % |
 | Evaluación | Tasa de descuento | I31 | % |
 | | Período de evaluación (años) | N31 | 5 · 6 · 7 · 8 · 9 · 10 · 15 · 25 |
-| Capacitores | kVAr · inversión U$D · ahorro $/año | F40, L40, P40 | Números — **visible solo si banco = SI** |
+| Capacitores | kVAr · inversión U$D · ahorro $/año | G40, L40, P40 | Números — **visible solo si banco = SI** |
 | Financiación | % a financiar | F44 | % |
 | | Tipo | H44 | Leasing · Préstamo |
 | | Moneda | K44 | $ar · U$D |
@@ -449,6 +449,7 @@ No bloquean el desarrollo. **Hasta que haya respuesta, se implementa el comporta
 | A3 | Ahorro por baterías: `PERFIL DE CONSUMO!X20` divide por `V30` (vacía) y `T26` suma `V24` (vacía) → nunca se suma | Ahorro por baterías = 0 | Definir fórmula (energía almacenada × precio, pico evitado, cortes) |
 | A4 | Potencia contratada (L7) cuando la factura trae pico y fuera de pico distintas | Precargar la **mayor** de las dos, mostrando ambas en la revisión; editable | Regla que defina el equipo (pico / fuera de pico / mayor) |
 | A5 | `Hoja1!R9` (Pot Contr kW, bloque CAMMESA) no se usa en fórmulas | Campo opcional, se guarda y se exporta al Excel, sin efecto en cálculos | Eliminarlo o incorporarlo (posiblemente GUME) |
+| A6 | **[PENDIENTE DE DECISIÓN]** Costo distribuidora $/kWh sugerido (§5.4). El "importe básico" incluye cargos fijos y de capacidad contratada, que la solar no reduce. Ej. factura EPE 07/2026: importe básico ÷ kWh = **434 $/kWh**; solo energía activa ÷ kWh = **124 $/kWh** (≈ 3,5× menos ahorro) | Se precarga importe básico ÷ kWh (como dice §5.4) y en la revisión se muestran ambos valores; editable | Precargar solo energía activa ÷ kWh (`importe_energia_activa`, ya se extrae). Cambio en `extraccion/derivados.py → sugerir()` y en `aplicarSugerencias` del frontend |
 
 ### 14.3 Resueltos
 

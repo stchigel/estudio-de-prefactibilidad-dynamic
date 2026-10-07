@@ -1,0 +1,218 @@
+{
+ "version": "planilla-2026-09",
+ "kits": [
+  {
+   "kwp": 11.02,
+   "precio_usd_kwp": {
+    "Coplanar": 769,
+    "Engrafado": 784.5172413793103,
+    "Losa": 859,
+    "Piso": 903
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 81.80580762250455,
+    "Deye Hib": 134.0744101633394
+   },
+   "cable_ca_usd_m": 18
+  },
+  {
+   "kwp": 16.24,
+   "precio_usd_kwp": {
+    "Coplanar": 700,
+    "Engrafado": 715.5172413793103,
+    "Losa": 787.5,
+    "Piso": 903
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 114.3472906403941,
+    "Deye Hib": 127.74014778325125
+   },
+   "cable_ca_usd_m": 18
+  },
+  {
+   "kwp": 22.04,
+   "precio_usd_kwp": {
+    "Coplanar": 660,
+    "Engrafado": 675.5172413793103,
+    "Losa": 745.8,
+    "Piso": 877.8000000000001
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 42.53629764065336,
+    "Deye Hib": 90.72141560798548
+   },
+   "cable_ca_usd_m": 26
+  },
+  {
+   "kwp": 27.84,
+   "precio_usd_kwp": {
+    "Coplanar": 626,
+    "Engrafado": 641.5172413793103,
+    "Losa": 712,
+    "Piso": 852
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 45.3125,
+    "Deye Hib": 178.3405172413793
+   },
+   "cable_ca_usd_m": 25
+  },
+  {
+   "kwp": 33.64,
+   "precio_usd_kwp": {
+    "Coplanar": 590,
+    "Engrafado": 605.5172413793103,
+    "Losa": 682.748,
+    "Piso": 814.1999999999999
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 40.17538644470868,
+    "Deye Hib": 146.2990487514863
+   },
+   "cable_ca_usd_m": 31
+  },
+  {
+   "kwp": 44.08,
+   "precio_usd_kwp": {
+    "Coplanar": 570,
+    "Engrafado": 585.5172413793103,
+    "Losa": 662.3399999999999,
+    "Piso": 792.3
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 42.80852994555354,
+    "Deye Hib": 109.47141560798549
+   },
+   "cable_ca_usd_m": 45
+  },
+  {
+   "kwp": 55.68,
+   "precio_usd_kwp": {
+    "Coplanar": 551,
+    "Engrafado": 566.5172413793103,
+    "Losa": 645,
+    "Piso": 772
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 38.119612068965516,
+    "Deye Hib": 84.91379310344827
+   },
+   "cable_ca_usd_m": 45
+  },
+  {
+   "kwp": 88.16,
+   "precio_usd_kwp": {
+    "Coplanar": 537,
+    "Engrafado": 552.5172413793103,
+    "Losa": 636.345,
+    "Piso": 751.8
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 52.847096188747734,
+    "Deye Hib": 71.81828493647913
+   },
+   "cable_ca_usd_m": 64
+  },
+  {
+   "kwp": 110.2,
+   "precio_usd_kwp": {
+    "Coplanar": 524,
+    "Engrafado": 539.5172413793103,
+    "Losa": 618,
+    "Piso": 729
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 31.59255898366606,
+    "Deye Hib": 76.83756805807623
+   },
+   "cable_ca_usd_m": 83
+  },
+  {
+   "kwp": 139.02,
+   "precio_usd_kwp": {
+    "Coplanar": 512,
+    "Engrafado": 527.5172413793103,
+    "Losa": 605,
+    "Piso": 706
+   },
+   "adicional_inversor_usd_kwp": {
+    "Growatt": 0,
+    "Huawei": 30.438066465256796,
+    "Deye Hib": 55.2870090634441
+   },
+   "cable_ca_usd_m": 125
+  }
+ ],
+ "baterias": [
+  {
+   "modelo": "Low Voltage 5,12 kWh",
+   "kwh": 5.12,
+   "capacidad_calculo_kwh": 0.0,
+   "precio_usd": 1329,
+   "precio_pdu_usd": 0,
+   "precio_rack_usd": 0,
+   "min_baterias": null,
+   "max_baterias": null,
+   "baterias_por_pdu": null,
+   "baterias_por_rack": null
+  },
+  {
+   "modelo": "Low Voltage 16 kWh",
+   "kwh": 16.0,
+   "capacidad_calculo_kwh": 0.0,
+   "precio_usd": 3523.5,
+   "precio_pdu_usd": 0,
+   "precio_rack_usd": 0,
+   "min_baterias": null,
+   "max_baterias": null,
+   "baterias_por_pdu": null,
+   "baterias_por_rack": null
+  },
+  {
+   "modelo": "High Voltage 7,68 kWh min 7 bat",
+   "kwh": 7.68,
+   "capacidad_calculo_kwh": 7.68,
+   "precio_usd": 2290.5,
+   "precio_pdu_usd": 1930.5,
+   "precio_rack_usd": 633,
+   "min_baterias": 7,
+   "max_baterias": null,
+   "baterias_por_pdu": 21,
+   "baterias_por_rack": 13
+  },
+  {
+   "modelo": "High Voltage 12,03 kWh min 5 bat",
+   "kwh": 12.03,
+   "capacidad_calculo_kwh": 12.03,
+   "precio_usd": 3364.5,
+   "precio_pdu_usd": 2056.5,
+   "precio_rack_usd": 0,
+   "min_baterias": 5,
+   "max_baterias": 16,
+   "baterias_por_pdu": 16,
+   "baterias_por_rack": null
+  },
+  {
+   "modelo": "High Voltage 16 kWh min 5 bat",
+   "kwh": 16.0,
+   "capacidad_calculo_kwh": 16.1,
+   "precio_usd": 3750,
+   "precio_pdu_usd": 1995,
+   "precio_rack_usd": 1140,
+   "min_baterias": 5,
+   "max_baterias": 16,
+   "baterias_por_pdu": 16,
+   "baterias_por_rack": 16
+  }
+ ],
+ "margen_baterias": 1.5
+}

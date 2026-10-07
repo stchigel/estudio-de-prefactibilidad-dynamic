@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prefactibilidad-dynamic"
+version = "0.1.0"
+description = "Estudios de prefactibilidad solar (Dynamic Energy): motor de cálculo, API y exportes"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.11",
+    "fastapi>=0.115",
+    "lxml>=5",
+    "openpyxl>=3.1",
+    "pillow>=10",
+    "pydantic>=2.8",
+    "python-pptx>=1.0",
+    "python-multipart>=0.0.9",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8",
+    "pywin32>=306; sys_platform == 'win32'",  # solo para scripts/generar_casos_excel.py
+]
+
+[tool.setuptools.packages.find]
+include = ["motor*", "exportes*", "extraccion*", "api*"]
+
+[tool.setuptools.package-data]
+motor = ["datos/*.json"]
+exportes = ["plantillas/*.pptx"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "tests"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
