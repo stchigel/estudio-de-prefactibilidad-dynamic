@@ -14,6 +14,19 @@ Especificación: [docs/especificacion.md](docs/especificacion.md) · pendientes 
 - Node.js 20 o superior (probado con 24 LTS)
 - Opcional: API key de Gemini (pruebas) o de Anthropic (producción) para leer facturas automáticamente
 
+## Iniciar el sistema (Windows)
+
+Doble clic en el script de la carpeta del repositorio:
+
+| Script | Para qué |
+|---|---|
+| `iniciar.bat` | Uso normal. Compila el frontend y abre backend y frontend en dos ventanas; al terminar abre el navegador y muestra la dirección para otras PCs (Tailscale) |
+| `iniciar-desarrollo.bat` | Para trabajar en el código: recarga automática al guardar cambios |
+| `detener.bat` | Apaga los dos servidores (también alcanza con cerrar sus ventanas) |
+
+La primera vez los scripts instalan solos las dependencias si faltan. Después de actualizar
+el código con dependencias nuevas, correr los comandos de "Primera vez".
+
 ## Primera vez
 
 Desde la carpeta del repositorio, en una terminal (Git Bash o PowerShell):
@@ -31,9 +44,9 @@ npm install
 cd ..
 ```
 
-## Iniciar el sistema
+## Iniciar a mano
 
-Hacen falta **dos terminales**, una para cada servidor.
+Sin los scripts hacen falta **dos terminales**, una para cada servidor.
 
 **Terminal 1 — backend (API)**
 
