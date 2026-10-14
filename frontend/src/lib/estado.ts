@@ -55,6 +55,31 @@ export function entradasIniciales(): Entradas {
   };
 }
 
+/**
+ * Parámetros de mercado y criterios de la empresa: cambian poco entre análisis,
+ * así que se arrastran a la propuesta siguiente. El resto es propio de cada cliente.
+ */
+const CAMPOS_PERSISTENTES = [
+  "dolar",
+  "costo_mayorista",
+  "tasa_mayorista",
+  "costo_cammesa",
+  "tasa_cammesa",
+  "tasa_976",
+  "res281_usd_mwh",
+  "k_incertidumbre",
+  "comision",
+  "tasa_descuento",
+  "periodo_evaluacion",
+] as const satisfies readonly (keyof Entradas)[];
+
+/** Entradas en blanco para un análisis nuevo, conservando solo los campos persistentes. */
+export function entradasNuevoAnalisis(previas: Entradas): Entradas {
+  const e = entradasIniciales();
+  for (const campo of CAMPOS_PERSISTENTES) (e as unknown as Record<string, unknown>)[campo] = previas[campo];
+  return e;
+}
+
 export interface Borrador {
   paso: Paso;
   entradas: Entradas;

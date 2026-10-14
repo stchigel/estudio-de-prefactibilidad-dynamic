@@ -12,6 +12,7 @@ import {
   aplicarSugerencias,
   borrarBorrador,
   entradasIniciales,
+  entradasNuevoAnalisis,
   guardarBorrador,
   leerBorrador,
   PASOS,
@@ -53,7 +54,7 @@ function Asistente() {
   const nueva = () => {
     if (!confirm("¿Descartar la propuesta actual y empezar una nueva?")) return;
     borrarBorrador();
-    setEntradas(entradasIniciales());
+    setEntradas(entradasNuevoAnalisis);
     setExtraccion(null);
     setArchivos([]);
     setPaso("Facturas");
@@ -112,7 +113,8 @@ function Asistente() {
           setArchivos={setArchivos}
           alExtraer={(r) => {
             setExtraccion(r);
-            setEntradas((e) => aplicarSugerencias(e, r));
+            // Facturas nuevas = análisis nuevo: no se arrastran los datos del cliente anterior.
+            setEntradas((e) => aplicarSugerencias(entradasNuevoAnalisis(e), r));
             setPaso("Consumos");
           }}
           alSaltear={() => setPaso("Consumos")}
