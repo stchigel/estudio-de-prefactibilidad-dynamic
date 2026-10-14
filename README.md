@@ -92,8 +92,10 @@ consumos se cargan a mano.
 | `EXTRACCION_MODELO` | Forzar un modelo (por defecto `gemini-3.5-flash` / `claude-sonnet-5-5`) |
 | `EXTRACCION_ESFUERZO` | Solo Claude: `low` (por defecto) / `medium` / `high` |
 
-En el frontend, `NEXT_PUBLIC_API_URL` permite apuntar a un backend que no esté en
-`http://localhost:8000`.
+El frontend reenvía las llamadas a `/api` al backend (`BACKEND_URL`, por defecto
+`http://127.0.0.1:8000`), así que desde otras PCs solo hace falta llegar al puerto 3000.
+Para abrir la aplicación en modo desarrollo desde otra IP o nombre de host, agregarlo a
+`allowedDevOrigins` en [frontend/next.config.ts](frontend/next.config.ts).
 
 ## Tests
 

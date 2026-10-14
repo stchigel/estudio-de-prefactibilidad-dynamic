@@ -7,7 +7,8 @@ import type {
   ResultadoBusqueda,
 } from "./tipos";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Por defecto, mismo origen: next.config.ts reenvía /api al backend.
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export class ErrorApi extends Error {
   constructor(
