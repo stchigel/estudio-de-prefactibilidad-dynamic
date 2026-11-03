@@ -142,7 +142,7 @@ Réplica de las hojas `Hoja1`, `PERFIL DE CONSUMO`, `BAT`, `ROI`, `VAN TIR`, `Fi
 | | Costo CAMMESA $/kWh + tasas | L9, O9 | Número, % |
 | | Costo distribuidora $/kWh + tasas mun/prov | E11, I11 | Número, % (sugerido de factura) |
 | | Tasa Res. 976/23 promedio | M11 | % — **visible solo si GUDI** |
-| | Res. 281 U$D/MWh | R11 | Número |
+| | Res. 976/281 U$D/MWh (etiqueta en pantalla) | R11 | Número |
 | | Retribución por inyección $/kWh | F13 | Número |
 | Sistema | Tipo inversor | E15 | ON GRID · HIBRIDO |
 | | Inhibición de inyección | K15 | SI · NO |
@@ -333,15 +333,15 @@ Se recomienda aplicar también #2 en la planilla para que el Excel exportado coi
    - generen excedente inyectado desproporcionado con inhibición = SI (umbral configurable).
 3. Calcular cada combinación con el motor completo.
 4. Ordenar por **ROI** (menor = mejor). Desempate: mayor cobertura cuando la diferencia de ROI < 0,2 años (configurable).
-5. Presentar hasta **5** opciones escalonadas por cobertura (el salto de 10 % se achica hasta 2,5 % si el rango es angosto); marcar la **recomendada** (mejor ROI).
-6. Cada opción tiene un tilde «En el PPT»: las tildadas forman la tabla de opciones de la presentación (la elegida va siempre). El usuario puede **elegir otra manualmente** o editar una opción. La opción elegida alimenta las diapositivas de "los números", ROI y financiación.
+5. Presentar la **recomendada** (mejor ROI) más **2 tamaños más chicos y 2 más grandes** en potencia (separados al menos 15 % entre sí; si de un lado no alcanzan, se completan con el otro). Combinaciones de potencia similar (±5 %) son el mismo tamaño: si la segunda tiene ROI a menos de 0,2 años de la mejor, se muestran **las dos** (p. ej. 2 × 55 kWp y 1 × 110 kWp).
+6. Los kits armados a mano se **agregan a la tabla** (no reemplazan la búsqueda) y se pueden elegir como la preferida. Cada opción tiene un tilde «En el PPT»; las destildadas se ven atenuadas: las tildadas forman la tabla de opciones de la presentación (la elegida va siempre). El usuario puede **elegir otra manualmente** o editar una opción. La opción elegida alimenta las diapositivas de "los números", ROI y financiación.
 
 ---
 
 ## 8. Panel de resultados
 
 - **KPIs**: potencia, inversión, generación, cobertura, autoconsumo, superficie (vs. disponible), ahorro anual, ROI, TIR, VAN.
-- **Gráficos**: consumo vs. generación mensual; curva de ROI (capital acumulado); cash flow de financiación (pagos vs. ahorros, 7 años); comparación de opciones.
+- **Gráficos**: consumo vs. generación mensual; curva de ROI (capital acumulado); cash flow de financiación **semestral** (pagos y ahorros en barras, ahorro acumulado en línea, 7 años); comparación de opciones.
 - **Sensibilidad rápida**: dólar, tasa de descuento, inhibición, baterías → recálculo inmediato.
 - **Alertas**: superficie insuficiente, potencia sobre contratada, meses estimados, validaciones de baterías.
 

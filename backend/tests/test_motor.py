@@ -105,6 +105,21 @@ def test_plazo_es_el_total_y_la_gracia_paga_solo_intereses():
     assert saldo == pytest.approx(0, abs=1e-6)
 
 
+def test_financiacion_semestral():
+    e = plecor()
+    r = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=5, gracia_anios=1, tasa=0.02, gastos_adm=0.01)))
+    f = r.financiacion
+    assert len(f.pagos_semestrales) == len(f.ahorros_semestrales) == len(f.ahorro_acumulado_semestral) == 14
+    # Los dos semestres de cada año suman el pago anual (el anticipo cae en el primer semestre).
+    for anio in range(7):
+        assert f.pagos_semestrales[2 * anio] + f.pagos_semestrales[2 * anio + 1] == pytest.approx(f.pagos[anio])
+    anticipo = r.inversion.total_usd - f.monto_financiado
+    assert f.pagos_semestrales[0] - f.pagos_semestrales[1] == pytest.approx(anticipo)
+    assert f.ahorros_semestrales == [pytest.approx(r.economia.ahorro_anual_usd / 2)] * 14
+    assert f.ahorro_acumulado_semestral[-1] == pytest.approx(7 * r.economia.ahorro_anual_usd)
+    assert f.ahorro_acumulado_semestral == sorted(f.ahorro_acumulado_semestral)
+
+
 def test_varios_anios_de_gracia():
     e = plecor()
     r = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=5, gracia_anios=2, tasa=0.02, gastos_adm=0.01)))

@@ -109,9 +109,13 @@ def test_graficos_nativos(simple):
     roi = list(graficos["GRAFICO:roi"].plots[0].series[0].values)
     assert len(roi) == r.anios_curva_roi == 10  # ROI 4,33 → ROI + 5 años, no 15 fijos
     assert roi == pytest.approx(r.curva_roi[: r.anios_curva_roi])
-    fin = graficos["GRAFICO:financiacion"].plots[0].series
-    assert list(fin[0].values) == pytest.approx(r.financiacion.pagos)
-    assert list(fin[1].values) == pytest.approx(r.financiacion.ahorros)
+    # Financiación por semestre (14) con el ahorro acumulado como línea sobre las barras.
+    plots = graficos["GRAFICO:financiacion"].plots
+    barras, linea = plots[0].series, plots[1].series
+    assert list(barras[0].values) == pytest.approx(r.financiacion.pagos_semestrales)
+    assert list(barras[1].values) == pytest.approx(r.financiacion.ahorros_semestrales)
+    assert list(linea[0].values) == pytest.approx(r.financiacion.ahorro_acumulado_semestral)
+    assert len(barras[0].values) == 14 and len(plots) == 2
 
 
 def test_tabla_de_opciones():
@@ -204,8 +208,27 @@ def test_texto_de_financiacion_con_plazo_total_y_gracia(simple):
 def test_tabla_de_opciones_con_las_tildadas():
     e = plecor()
     b = buscar_opciones(e)
-    assert len(b.opciones) == 5
+    assert len(b.opciones) > 6  # más filas que las de la plantilla: la tabla se achica
     opciones = [OpcionPpt(o.kit1, o.kit2, o.recomendada, o.resultado) for o in b.opciones]
-    prs, _ = _generar(DatosPpt(e, opciones[-1].resultado, opciones))
+    prs, textos = _generar(DatosPpt(e, opciones[-1].resultado, opciones))
     tabla = next(f.table for s in prs.slides for f in _formas(s) if f.name == "TABLA:opciones")
-    assert len(list(tabla.rows)) == 6
+    assert len(list(tabla.rows)) == 1 + len(opciones)
+    assert 2_473_575 + sum(f.height for f in tabla.rows) < 5_620_231  # no pisa la nota al pie (Text 12)
+    # Combinaciones de igual potencia se distinguen por sus kits.
+    potencias = [round(o.resultado.kwp_total, 1) for o in opciones]
+    repetida = next(p for p in potencias if potencias.count(p) > 1)
+    assert any(f"{repetida:.1f}".replace(".", ",") + " (" in c.text for fila in tabla.rows for c in fila.cells)
+
+
+def test_la_tabla_resalta_la_elegida_y_no_la_recomendada():
+    e = plecor()
+    b = buscar_opciones(e)
+    opciones = [OpcionPpt(o.kit1, o.kit2, o.recomendada, o.resultado) for o in b.opciones]
+    elegida = next(o for o in opciones if not o.recomendada)
+    prs, textos = _generar(DatosPpt(replace(e, kit1=elegida.kit1, kit2=elegida.kit2), elegida.resultado, opciones))
+    tabla = next(f.table for s in prs.slides for f in _formas(s) if f.name == "TABLA:opciones")
+    filas = list(tabla.rows)[1:]
+    resaltadas = [i for i, fila in enumerate(filas) if fila.cells[0].text_frame.paragraphs[0].runs[0].font.bold]
+    assert resaltadas == [opciones.index(elegida)]
+    todo = "\n".join(textos)
+    assert "Opción Elegida" in todo and "Se marca la opción elegida" in todo and "{{" not in todo

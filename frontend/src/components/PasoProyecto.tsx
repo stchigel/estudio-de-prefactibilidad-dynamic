@@ -146,7 +146,7 @@ export function PasoProyecto({
               <Numero valor={e.tasa_976} porcentaje alCambiar={(v) => alCambiar({ tasa_976: v ?? 0 })} />
             </Campo>
           )}
-          <Campo etiqueta="Res. 281">
+          <Campo etiqueta="Res. 976/281">
             <Numero valor={e.res281_usd_mwh} sufijo="U$D/MWh" alCambiar={(v) => alCambiar({ res281_usd_mwh: v ?? 0 })} />
           </Campo>
           <Campo etiqueta="Retribución por inyección">

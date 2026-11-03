@@ -292,6 +292,10 @@ class ResultadoFinanciacion:
     canon_anual: float
     pagos: list[float]  # años 1..7
     ahorros: list[float]
+    # Mismos 7 años por semestre (14 valores): el anticipo cae en el semestre 1.
+    pagos_semestrales: list[float] = field(default_factory=list)
+    ahorros_semestrales: list[float] = field(default_factory=list)
+    ahorro_acumulado_semestral: list[float] = field(default_factory=list)
 
 
 @dataclass

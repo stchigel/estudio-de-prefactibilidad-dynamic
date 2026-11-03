@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -110,19 +111,27 @@ export function GraficoRoi({ r }: { r: Resultado }) {
 }
 
 export function GraficoFinanciacion({ r }: { r: Resultado }) {
-  const datos = r.financiacion.pagos.map((p, i) => ({ anio: `Año ${i + 1}`, Pagos: p, Ahorros: r.financiacion.ahorros[i] }));
+  const f = r.financiacion;
+  // Por semestre: pagos y ahorros en barras, ahorro acumulado en línea.
+  const datos = f.pagos_semestrales.map((p, i) => ({
+    semestre: `S${i + 1}`,
+    Pagos: p,
+    Ahorros: f.ahorros_semestrales[i],
+    "Ahorro acumulado": f.ahorro_acumulado_semestral[i],
+  }));
   return (
-    <Marco titulo="Financiamiento: pagos vs. ahorros" descripcion="U$D por año, primeros 7 años">
+    <Marco titulo="Financiamiento: pagos vs. ahorros" descripcion="U$D por semestre, primeros 7 años · el ahorro acumulado va en línea">
       <ResponsiveContainer>
-        <BarChart data={datos} barGap={2} barCategoryGap="25%">
+        <ComposedChart data={datos} barGap={2} barCategoryGap="25%">
           {GRILLA}
-          <XAxis dataKey="anio" {...EJE} />
+          <XAxis dataKey="semestre" {...EJE} />
           <YAxis {...EJE} axisLine={false} tickFormatter={miles} width={48} />
           <Tooltip {...TOOLTIP} formatter={(v) => fmt.usd(Number(v))} />
           <Legend {...LEYENDA} />
-          <Bar dataKey="Pagos" fill="var(--serie-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-          <Bar dataKey="Ahorros" fill="var(--serie-2)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-        </BarChart>
+          <Bar dataKey="Pagos" fill="var(--serie-1)" radius={[4, 4, 0, 0]} maxBarSize={20} />
+          <Bar dataKey="Ahorros" fill="var(--serie-2)" radius={[4, 4, 0, 0]} maxBarSize={20} />
+          <Line dataKey="Ahorro acumulado" stroke="var(--tinta)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+        </ComposedChart>
       </ResponsiveContainer>
     </Marco>
   );

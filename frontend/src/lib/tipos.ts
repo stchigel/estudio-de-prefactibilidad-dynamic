@@ -120,7 +120,15 @@ export interface Resultado {
   anios_curva_roi: number;
   van_tir: { van: number; tir: number | null; van_por_periodo: Record<string, number> };
   ppa: { tir: number | null; ventas_anio1_usd: number };
-  financiacion: { monto_financiado: number; canon_anual: number; pagos: number[]; ahorros: number[] };
+  financiacion: {
+    monto_financiado: number;
+    canon_anual: number;
+    pagos: number[];
+    ahorros: number[];
+    pagos_semestrales: number[];
+    ahorros_semestrales: number[];
+    ahorro_acumulado_semestral: number[];
+  };
   huella: { tco2_anio: number; tco2_25_anios: number; arboles: number; autos: number };
   capacidad_bateria_recomendada_kwh: number;
   potencia_sugerida_kw: number;

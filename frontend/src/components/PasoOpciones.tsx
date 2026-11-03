@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import { fmt } from "@/lib/estado";
-import type { Entradas, Kit, KitsOpcion, OpcionesFormulario, ResultadoBusqueda } from "@/lib/tipos";
+import type { Entradas, Kit, KitsOpcion, Opcion, OpcionesFormulario, ResultadoBusqueda } from "@/lib/tipos";
 import { Aviso, Boton, Campo, Grilla, Insignia, Numero, Opciones, Seccion, SiNo } from "./ui";
 
 export function describirKits(k1: Kit, k2: Kit | null) {
   const parte = (k: Kit) => `${k.cantidad} × ${fmt.n(k.kwp, 2)} kWp`;
   return k2 && k2.cantidad > 0 ? `${parte(k1)} + ${parte(k2)}` : parte(k1);
 }
+
+/** Identifica una combinación de kits (la distancia al tablero no la distingue). */
+const clave = (k1: Kit, k2: Kit | null) => `${k1.kwp}x${k1.cantidad}+${k2 && k2.cantidad > 0 ? `${k2.kwp}x${k2.cantidad}` : "-"}`;
+
+type Fila = Opcion & { manual?: boolean };
 
 const MOTIVOS: Record<string, string> = {
   potencia: "superan la potencia contratada",
@@ -27,16 +32,19 @@ export function PasoOpciones({
 }: {
   e: Entradas;
   opciones: OpcionesFormulario;
-  /** `opcionesPpt`: las opciones tildadas para la tabla del PowerPoint (null = todas). */
+  /** `opcionesPpt`: las opciones tildadas para la tabla del PowerPoint (null = todas las de la búsqueda). */
   alElegir: (kit1: Kit, kit2: Kit | null, opcionesPpt: KitsOpcion[] | null) => void;
   alVolver: () => void;
 }) {
   const [busqueda, setBusqueda] = useState<ResultadoBusqueda | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [elegida, setElegida] = useState(0);
-  // Opciones que van a la tabla del PowerPoint (por posición); la elegida siempre va.
-  const [destildadas, setDestildadas] = useState<Set<number>>(new Set());
+  const [agregadas, setAgregadas] = useState<Fila[]>([]);
+  const [elegida, setElegida] = useState<string | null>(null);
+  // Opciones fuera de la tabla del PowerPoint; la elegida siempre va.
+  const [destildadas, setDestildadas] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState(false);
+  const [agregando, setAgregando] = useState(false);
+  const [errorAgregar, setErrorAgregar] = useState<string | null>(null);
   const [kit1, setKit1] = useState<Kit>(e.kit1);
   const [kit2, setKit2] = useState<Kit | null>(e.kit2);
 
@@ -47,7 +55,8 @@ export function PasoOpciones({
       .then((r) => {
         if (!vigente) return;
         setBusqueda(r);
-        setElegida(Math.max(0, r.opciones.findIndex((o) => o.recomendada)));
+        const rec = r.opciones.find((o) => o.recomendada) ?? r.opciones[0];
+        if (rec) setElegida(clave(rec.kit1, rec.kit2));
       })
       .catch((err: ErrorApi) => vigente && setError(err.message));
     return () => {
@@ -57,28 +66,59 @@ export function PasoOpciones({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Las de la búsqueda y las agregadas a mano, juntas y ordenadas por potencia.
+  const filas = useMemo<Fila[]>(
+    () => [...(busqueda?.opciones ?? []), ...agregadas].sort((a, b) => a.resultado.kwp_total - b.resultado.kwp_total),
+    [busqueda, agregadas],
+  );
+
   const kwps = opciones.kits.map((k) => k.kwp);
-  const enPpt = (i: number) => i === elegida || !destildadas.has(i);
+  const enPpt = (f: Fila) => clave(f.kit1, f.kit2) === elegida || !destildadas.has(clave(f.kit1, f.kit2));
   const opcionesPpt = (): KitsOpcion[] | null => {
-    if (!busqueda || destildadas.size === 0) return null;
-    return busqueda.opciones.flatMap((o, i) => (enPpt(i) ? [{ kit1: o.kit1, kit2: o.kit2 }] : []));
+    if (destildadas.size === 0 && agregadas.length === 0) return null;
+    return filas.filter(enPpt).map((f) => ({ kit1: f.kit1, kit2: f.kit2 }));
   };
-  const alternar = (i: number) =>
+  const alternar = (k: string) =>
     setDestildadas((previas) => {
       const nuevas = new Set(previas);
-      if (!nuevas.delete(i)) nuevas.add(i);
+      if (!nuevas.delete(k)) nuevas.add(k);
       return nuevas;
     });
+
+  const agregar = async () => {
+    const k2 = kit2 && kit2.cantidad > 0 ? kit2 : null;
+    const k = clave(kit1, k2);
+    setErrorAgregar(null);
+    if (filas.some((f) => clave(f.kit1, f.kit2) === k)) {
+      setElegida(k); // ya está en la tabla: se la elige
+      return;
+    }
+    setAgregando(true);
+    try {
+      const resultado = await api.calcular({ ...e, kit1, kit2: k2 });
+      setAgregadas((previas) => [...previas, { kit1, kit2: k2, recomendada: false, resultado, manual: true }]);
+      setElegida(k);
+    } catch (err) {
+      setErrorAgregar((err as ErrorApi).message);
+    } finally {
+      setAgregando(false);
+    }
+  };
+
+  const verResultados = () => {
+    const f = filas.find((x) => clave(x.kit1, x.kit2) === elegida);
+    if (f) alElegir(f.kit1, f.kit2, opcionesPpt());
+  };
 
   return (
     <div className="space-y-6">
       <Seccion titulo="Opciones propuestas">
         {!busqueda && !error && <p className="text-sm text-tinta-2">Evaluando combinaciones de kits…</p>}
         {error && <Aviso nivel="error">{error}</Aviso>}
-        {busqueda && busqueda.opciones.length === 0 && (
-          <Aviso nivel="advertencia">Ninguna combinación del catálogo cumple las restricciones. Elegí los kits a mano.</Aviso>
+        {busqueda && filas.length === 0 && (
+          <Aviso nivel="advertencia">Ninguna combinación del catálogo cumple las restricciones. Agregá los kits a mano.</Aviso>
         )}
-        {busqueda && busqueda.opciones.length > 0 && (
+        {busqueda && filas.length > 0 && (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm tabular-nums">
@@ -98,31 +138,38 @@ export function PasoOpciones({
                   </tr>
                 </thead>
                 <tbody>
-                  {busqueda.opciones.map((o, i) => {
+                  {filas.map((o) => {
                     const r = o.resultado;
+                    const k = clave(o.kit1, o.kit2);
+                    const esElegida = k === elegida;
+                    const fuera = !enPpt(o);
                     return (
                       <tr
-                        key={i}
-                        onClick={() => setElegida(i)}
-                        className={`cursor-pointer border-b border-borde/60 last:border-0 ${i === elegida ? "bg-acento/10" : "hover:bg-plano"}`}
+                        key={k}
+                        onClick={() => setElegida(k)}
+                        className={`cursor-pointer border-b border-borde/60 last:border-0 ${esElegida ? "bg-acento/10" : "hover:bg-plano"} ${
+                          fuera ? "text-tenue opacity-60" : ""
+                        }`}
                       >
                         <td className="py-2 pr-2">
-                          <input type="radio" checked={i === elegida} onChange={() => setElegida(i)} aria-label={`Opción ${i + 1}`} />
+                          <input type="radio" checked={esElegida} onChange={() => setElegida(k)} aria-label={`Elegir ${describirKits(o.kit1, o.kit2)}`} />
                         </td>
                         <td className="px-2" onClick={(ev) => ev.stopPropagation()}>
                           <input
                             type="checkbox"
-                            checked={enPpt(i)}
-                            disabled={i === elegida}
-                            onChange={() => alternar(i)}
-                            aria-label={`Incluir la opción ${i + 1} en la tabla del PowerPoint`}
-                            title={i === elegida ? "La opción elegida siempre se incluye" : undefined}
+                            checked={!fuera}
+                            disabled={esElegida}
+                            onChange={() => alternar(k)}
+                            aria-label={`Incluir ${describirKits(o.kit1, o.kit2)} en la tabla del PowerPoint`}
+                            title={esElegida ? "La opción elegida siempre se incluye" : undefined}
                           />
                         </td>
                         <td className="px-2">
                           <span className="flex flex-wrap items-center gap-2">
                             {describirKits(o.kit1, o.kit2)}
                             {o.recomendada && <Insignia tono="bueno">Recomendada</Insignia>}
+                            {o.manual && <Insignia tono="acento">Agregada a mano</Insignia>}
+                            {fuera && <Insignia tono="neutro">Fuera del PPT</Insignia>}
                           </span>
                         </td>
                         <td className="px-2 text-right">{fmt.n(r.kwp_total, 2)} kWp</td>
@@ -141,10 +188,11 @@ export function PasoOpciones({
             </div>
             <div className="mt-4 space-y-1 text-xs text-tinta-2">
               <p>
-                La recomendada es la de mejor ROI; ante diferencias menores a 0,2 años se prefiere la de mayor cobertura. Se evaluaron{" "}
+                Se muestra la recomendada, dos tamaños más chicos y dos más grandes. La recomendada es la de mejor ROI; ante diferencias
+                menores a 0,2 años se prefiere la de mayor cobertura, pero se muestran las dos combinaciones. Se evaluaron{" "}
                 {fmt.entero(busqueda.evaluadas)} combinaciones, {fmt.entero(busqueda.validas)} válidas.
               </p>
-              <p>Las opciones tildadas en «En el PPT» forman la tabla de opciones de la presentación.</p>
+              <p>Las opciones tildadas en «En el PPT» forman la tabla de opciones de la presentación; las destildadas se ven atenuadas.</p>
               {Object.entries(busqueda.descartes).map(([motivo, n]) => (
                 <p key={motivo}>
                   {fmt.entero(n)} descartadas porque {MOTIVOS[motivo] ?? motivo}.
@@ -161,7 +209,7 @@ export function PasoOpciones({
       </Seccion>
 
       <Seccion
-        titulo="Elegir kits a mano"
+        titulo="Agregar kits a mano"
         accion={
           <Boton variante="fantasma" onClick={() => setManual(!manual)}>
             {manual ? "Ocultar" : "Mostrar"}
@@ -197,14 +245,16 @@ export function PasoOpciones({
                 </>
               )}
             </Grilla>
-            <div className="flex justify-end">
-              <Boton variante="secundario" onClick={() => alElegir(kit1, kit2, opcionesPpt())} deshabilitado={kit1.cantidad < 1}>
-                Calcular con estos kits
+            {errorAgregar && <Aviso nivel="error">{errorAgregar}</Aviso>}
+            <div className="flex items-center justify-end gap-3">
+              <span className="text-xs text-tenue">Se suma a la tabla de arriba y queda elegida; después se puede cambiar.</span>
+              <Boton variante="secundario" onClick={agregar} deshabilitado={kit1.cantidad < 1} cargando={agregando}>
+                Agregar a la tabla
               </Boton>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-tinta-2">Para comparar otra combinación de kits del catálogo, o fijar la distancia al tablero.</p>
+          <p className="text-sm text-tinta-2">Para sumar a la tabla otra combinación de kits del catálogo, o fijar la distancia al tablero.</p>
         )}
       </Seccion>
 
@@ -212,13 +262,7 @@ export function PasoOpciones({
         <Boton variante="secundario" onClick={alVolver}>
           Volver
         </Boton>
-        <Boton
-          onClick={() => {
-            const o = busqueda?.opciones[elegida];
-            if (o) alElegir(o.kit1, o.kit2, opcionesPpt());
-          }}
-          deshabilitado={!busqueda?.opciones.length}
-        >
+        <Boton onClick={verResultados} deshabilitado={!elegida || filas.length === 0}>
           Ver resultados
         </Boton>
       </div>

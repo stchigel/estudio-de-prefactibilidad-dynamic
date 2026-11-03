@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -194,9 +195,16 @@ async def exportar_ppt(
             ):
                 continue
             opciones.append(OpcionPpt(o.kit1, o.kit2, o.recomendada, resultado if elegida else o.resultado))
+        # Kits agregados a mano en la lista: no salen de la búsqueda, se calculan aparte.
+        for t in tildadas or []:
+            if not any(_mismos_kits(o.kit1, o.kit2, t.kit1, t.kit2) for o in opciones):
+                manual = resultado if _mismos_kits(t.kit1, t.kit2, e.kit1, e.kit2) else calcular(
+                    replace(e, kit1=t.kit1, kit2=t.kit2)
+                )
+                opciones.append(OpcionPpt(t.kit1, t.kit2, False, manual))
         if not any(o.resultado is resultado for o in opciones):
             opciones.append(OpcionPpt(e.kit1, e.kit2, False, resultado))
-            opciones.sort(key=lambda o: o.resultado.energia.cobertura)
+        opciones.sort(key=lambda o: (o.resultado.energia.cobertura, o.resultado.roi_anios or 0))
 
     imagenes = {}
     for nombre, archivo in (("logo", logo), ("planta", planta), ("montaje", montaje)):

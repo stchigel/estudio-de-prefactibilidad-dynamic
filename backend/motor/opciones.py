@@ -15,12 +15,19 @@ class ConfigBusqueda:
     max_desperdicio_inhibido: float = 0.15
     # Diferencias de ROI menores a esta se consideran empate y gana la mayor cobertura.
     tolerancia_roi_anios: float = 0.2
-    max_opciones: int = 5
-    # Salto mínimo de cobertura entre opciones presentadas (escalonado). Si con ese salto no se
-    # llega a `max_opciones` (rango de cobertura angosto, p. ej. por la potencia contratada),
-    # se achica a la mitad hasta `salto_cobertura_minimo`.
-    salto_cobertura: float = 0.10
-    salto_cobertura_minimo: float = 0.02
+    # Se presentan la recomendada, `opciones_menores` tamaños más chicos y `opciones_mayores` más
+    # grandes (en potencia). Si de un lado no alcanzan, se completan con el otro.
+    opciones_menores: int = 2
+    opciones_mayores: int = 2
+    # Combinaciones con potencia dentro de esta fracción cuentan como el mismo "tamaño"
+    # (p. ej. 1 × 110,2 kWp y 2 × 55,68 kWp).
+    tolerancia_tamano: float = 0.05
+    # Entre un tamaño presentado y el siguiente hay al menos esta diferencia relativa de potencia,
+    # para que las opciones sean realmente distintas.
+    separacion_tamanos: float = 0.15
+    # Si hay más de una combinación de un mismo tamaño con ROI dentro de la tolerancia
+    # (`tolerancia_roi_anios`), se muestran hasta esta cantidad.
+    max_por_tamano: int = 2
     # Tope de cobertura cuando no hay potencia contratada informada.
     cobertura_max_sin_potencia: float = 1.0
 
@@ -122,19 +129,59 @@ def _motivo_descarte(c: Candidata, e: Entradas, cfg: ConfigBusqueda, controlar_p
     return None
 
 
-def _escalonar(ranking: list[Candidata], cfg: ConfigBusqueda) -> list[Candidata]:
-    """La mejor por ROI + las siguientes mejores separadas por al menos un salto de cobertura."""
-    salto = cfg.salto_cobertura
-    while True:
-        elegidas: list[Candidata] = []
-        for c in ranking:
-            if all(abs(c.cobertura - x.cobertura) >= salto for x in elegidas):
-                elegidas.append(c)
-            if len(elegidas) == cfg.max_opciones:
-                return elegidas
-        if salto / 2 < cfg.salto_cobertura_minimo:
-            return elegidas
-        salto /= 2
+def _agrupar_por_tamano(candidatas: list[Candidata], tolerancia: float) -> list[list[Candidata]]:
+    """Agrupa por potencia creciente: las que difieren menos de `tolerancia` son el mismo tamaño."""
+    grupos: list[list[Candidata]] = []
+    for c in sorted(candidatas, key=lambda c: c.kwp):
+        if grupos and c.kwp <= grupos[-1][0].kwp * (1 + tolerancia):
+            grupos[-1].append(c)
+        else:
+            grupos.append([c])
+    return grupos
+
+
+def _seleccionar(ranking: list[Candidata], cfg: ConfigBusqueda) -> list[Candidata]:
+    """La recomendada (primera del ranking) + los tamaños vecinos más chicos y más grandes.
+
+    Dentro de cada tamaño se muestra la de mejor ROI y, si hay otra combinación con ROI
+    a menos de `tolerancia_roi_anios`, también esa (la recomendada siempre va).
+    """
+    if not ranking:
+        return []
+    recomendada = ranking[0]
+    grupos = _agrupar_por_tamano(ranking, cfg.tolerancia_tamano)
+    centro = next(i for i, g in enumerate(grupos) if recomendada in g)
+    kwp_centro = recomendada.kwp
+
+    def vecinos(indices, cantidad: int, ancla: float) -> list[int]:
+        elegidos = []
+        for i in indices:
+            if len(elegidos) == cantidad:
+                break
+            kwp = grupos[i][0].kwp
+            if abs(kwp - ancla) >= ancla * cfg.separacion_tamanos:
+                elegidos.append(i)
+                ancla = kwp
+        return elegidos
+
+    menores = vecinos(range(centro - 1, -1, -1), cfg.opciones_menores, kwp_centro)
+    mayores = vecinos(range(centro + 1, len(grupos)), cfg.opciones_mayores, kwp_centro)
+    # Lo que no se puede cubrir de un lado se completa con el otro.
+    if len(menores) < cfg.opciones_menores:
+        mayores = vecinos(range(centro + 1, len(grupos)), cfg.opciones_mayores + cfg.opciones_menores - len(menores), kwp_centro)
+    if len(mayores) < cfg.opciones_mayores:
+        menores = vecinos(range(centro - 1, -1, -1), cfg.opciones_menores + cfg.opciones_mayores - len(mayores), kwp_centro)
+    elegidos = [grupos[i] for i in sorted([*menores, centro, *mayores])]
+
+    seleccion: list[Candidata] = []
+    for grupo in elegidos:
+        por_roi = sorted(grupo, key=lambda c: (c.roi_anios, -c.cobertura))
+        mejor = por_roi[0].roi_anios
+        miembros = [c for c in por_roi if c.roi_anios - mejor < cfg.tolerancia_roi_anios][: cfg.max_por_tamano]
+        if recomendada in grupo and recomendada not in miembros:
+            miembros = [recomendada, *miembros[: cfg.max_por_tamano - 1]]
+        seleccion += miembros
+    return seleccion
 
 
 def buscar_opciones(
@@ -176,10 +223,10 @@ def buscar_opciones(
     sin_control_potencia = _ordenar(sin_control_potencia, cfg.tolerancia_roi_anios)
     limitado = bool(validas and sin_control_potencia) and sin_control_potencia[0].kwp > e.potencia_contratada_kw > 0
 
-    elegidas = _escalonar(validas, cfg)
+    elegidas = _seleccionar(validas, cfg)
     opciones = [
-        Opcion(c.kit1, c.kit2, recomendada=(i == 0), resultado=calcular(replace(e, kit1=c.kit1, kit2=c.kit2), cat, par))
-        for i, c in enumerate(elegidas)
+        Opcion(c.kit1, c.kit2, recomendada=(c is validas[0]), resultado=calcular(replace(e, kit1=c.kit1, kit2=c.kit2), cat, par))
+        for c in elegidas
     ]
     opciones.sort(key=lambda o: o.resultado.energia.cobertura)
     return ResultadoBusqueda(

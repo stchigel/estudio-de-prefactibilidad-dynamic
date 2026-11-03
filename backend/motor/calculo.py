@@ -348,11 +348,26 @@ def _financiacion(e: Entradas, inversion: float, ahorro_usd: float) -> Resultado
         return canon if anio <= f.plazo_anios else 0.0
 
     pagos = [propio + pago(1)] + [pago(k) for k in range(2, ANIOS_FINANCIACION + 1)]
+
+    # Semestral: las cuotas y los intereses se reparten parejo en los dos semestres del año;
+    # el anticipo se paga en el primero. El ahorro es constante, así que también se parte en dos.
+    pagos_sem = []
+    for anio in range(1, ANIOS_FINANCIACION + 1):
+        mitad = pago(anio) / 2
+        pagos_sem += [mitad + (propio if anio == 1 else 0.0), mitad]
+    ahorros_sem = [ahorro_usd / 2] * (2 * ANIOS_FINANCIACION)
+    acumulado, total = [], 0.0
+    for a in ahorros_sem:
+        total += a
+        acumulado.append(total)
     return ResultadoFinanciacion(
         monto_financiado=financiado,
         canon_anual=canon,
         pagos=pagos,
         ahorros=[ahorro_usd] * ANIOS_FINANCIACION,
+        pagos_semestrales=pagos_sem,
+        ahorros_semestrales=ahorros_sem,
+        ahorro_acumulado_semestral=acumulado,
     )
 
 

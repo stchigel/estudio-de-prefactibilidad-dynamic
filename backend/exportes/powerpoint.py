@@ -30,6 +30,9 @@ NS_C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 MARCA = re.compile(r"\{\{(\w+)\}\}")
 CONDICION = re.compile(r"^\[\[si:(\w+)\]\]")
 ANIOS_VIDA_UTIL = 25
+FILAS_OPCIONES_PLANTILLA = 6  # filas de datos que entran con el tamaño original
+ALTO_DISPONIBLE_FILAS = 2_350_000  # EMU entre el encabezado de la tabla y la nota al pie
+COLOR_AHORRO_ACUMULADO = "2B231E"  # tinta de la plantilla: la línea se distingue de las barras
 RESALTADO_RECOMENDADA = RGBColor(0xFD, 0xE4, 0xE4)  # rojo muy claro, acorde a la marca
 # Párrafos condicionales que se vacían en lugar de quitarse, para no desalinear íconos.
 VACIAR_EN_LUGAR_DE_QUITAR = {"capacitores"}
@@ -137,6 +140,16 @@ def tipo_sistema(e: Entradas) -> str:
     return "ON-GRID" if e.tipo_inversor == TipoInversor.ON_GRID else "HÍBRIDO"
 
 
+def _nota_opcion_marcada(d: DatosPpt, elegida: OpcionPpt | None) -> str:
+    if elegida is None or elegida.recomendada:
+        return "Se marca la opción más recomendada en función de ROI y la cobertura obtenida "
+    recomendada = next((o for o in d.opciones if o.recomendada), None)
+    texto = "Se marca la opción elegida para este proyecto"
+    if recomendada is not None:
+        texto += f"; la recomendada por ROI y cobertura es la de {compacto(recomendada.resultado.kwp_total)} kWp"
+    return texto + " "
+
+
 def _valores(d: DatosPpt) -> dict[str, str]:
     e, r = d.entradas, d.resultado
     f = e.financiacion
@@ -198,6 +211,7 @@ def _valores(d: DatosPpt) -> dict[str, str]:
         "texto_arquitectura": arquitectura,
         "kwp_fase1": compacto(r.kwp_total),
         "titulo_numeros": titulo_numeros,
+        "nota_opcion_marcada": _nota_opcion_marcada(d, elegida),
         "kwp": compacto(r.kwp_total),
         "inversion": numero(r.inversion.total_usd),
         "generacion": numero(r.energia.generacion_anual_kwh),
@@ -349,11 +363,16 @@ def _tabla_opciones(slide, d: DatosPpt) -> None:
     capacidad_bat = 0.0
     if d.entradas.baterias_activas:
         capacidad_bat = catalogo_vigente().bateria(d.entradas.baterias.modelo).kwh * d.entradas.baterias.cantidad
+    # Dos combinaciones de igual potencia (p. ej. 1 × 110,2 y 2 × 55,68) se distinguen por sus kits.
+    potencias = [round(o.resultado.kwp_total, 1) for o in d.opciones]
     for fila, o in zip(list(tabla.rows)[1:], d.opciones):
         r = o.resultado
+        potencia = numero(r.kwp_total, 1)
+        if potencias.count(round(r.kwp_total, 1)) > 1:
+            potencia += f" ({_kits_texto(o.kit1, o.kit2)})"
         valores = [
             tipo_sistema(d.entradas).replace("-", " "),
-            numero(r.kwp_total, 1),
+            potencia,
             numero(capacidad_bat) if capacidad_bat else "--------",
             numero(r.energia.generacion_anual_kwh),
             porcentaje(r.energia.cobertura),
@@ -365,10 +384,26 @@ def _tabla_opciones(slide, d: DatosPpt) -> None:
             numero(r.superficie_m2),
         ]
         for celda, valor in zip(fila.cells, valores):
-            _poner_texto_celda(celda, valor, negrita=o.recomendada)
-            if o.recomendada:
+            # Se resalta la opción elegida (la de las demás diapositivas), no la que el sistema recomendó.
+            _poner_texto_celda(celda, valor, negrita=o.resultado is d.resultado)
+            if o.resultado is d.resultado:
                 celda.fill.solid()
                 celda.fill.fore_color.rgb = RESALTADO_RECOMENDADA
+    # Con muchas opciones las filas se achican para que la tabla no pise el pie de la diapositiva.
+    if len(d.opciones) > FILAS_OPCIONES_PLANTILLA:
+        alto_filas = ALTO_DISPONIBLE_FILAS // len(d.opciones)
+        for fila in list(tabla.rows)[1:]:
+            fila.height = Emu(alto_filas)
+            for celda in fila.cells:
+                celda.margin_top = celda.margin_bottom = Cm(0.03)
+                for parrafo in celda.text_frame.paragraphs:
+                    for run in parrafo.runs:
+                        run.font.size = Pt(10)
+
+
+def _kits_texto(kit1: Kit, kit2: Kit | None) -> str:
+    partes = [kit1] + ([kit2] if kit2 is not None and kit2.cantidad > 0 else [])
+    return " + ".join(f"{k.cantidad}×{numero(k.kwp, 2)}" for k in partes)
 
 
 def _tabla_consumos(slide, d: DatosPpt) -> None:
@@ -441,10 +476,47 @@ def _grafico_financiacion(slide, d: DatosPpt) -> None:
     fin = d.resultado.financiacion
     moneda = "dólares" if d.entradas.financiacion.moneda == Moneda.DOLARES else "pesos"
     datos = CategoryChartData()
-    datos.categories = [f"año{i}" for i in range(1, len(fin.pagos) + 1)]
-    datos.add_series(f"Pagos en {moneda}", fin.pagos)
-    datos.add_series(f"Ahorros en {moneda}", fin.ahorros)
+    datos.categories = [f"S{i}" for i in range(1, len(fin.pagos_semestrales) + 1)]  # semestres
+    datos.add_series(f"Pagos en {moneda}", fin.pagos_semestrales)
+    datos.add_series(f"Ahorros en {moneda}", fin.ahorros_semestrales)
+    datos.add_series(f"Ahorro acumulado en {moneda}", fin.ahorro_acumulado_semestral)
     f.chart.replace_data(datos)
+    _serie_a_linea(f.chart, indice=2, color=COLOR_AHORRO_ACUMULADO)
+
+
+def _serie_a_linea(grafico, indice: int, color: str) -> None:
+    """Pasa una serie de un gráfico de barras a una línea sobre los mismos ejes (gráfico combinado).
+
+    python-pptx no arma combinados: se mueve el `c:ser` a un `c:lineChart` nuevo.
+    """
+    area = grafico._chartSpace.find(f".//{{{NS_C}}}plotArea")
+    barras = area.find(f"{{{NS_C}}}barChart")
+    serie = barras.findall(f"{{{NS_C}}}ser")[indice]
+    barras.remove(serie)
+    for etiqueta in ("invertIfNegative", "dPt", "spPr", "shape"):
+        for x in serie.findall(f"{{{NS_C}}}{etiqueta}"):
+            serie.remove(x)
+    ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    linea_sp = etree.fromstring(
+        f'<c:spPr xmlns:c="{NS_C}" xmlns:a="{ns_a}"><a:ln w="31750" cap="rnd"><a:solidFill><a:srgbClr val="{color}"/>'
+        "</a:solidFill><a:round/></a:ln></c:spPr>"
+    )
+    marcador = etree.fromstring(
+        f'<c:marker xmlns:c="{NS_C}" xmlns:a="{ns_a}"><c:symbol val="circle"/><c:size val="5"/>'
+        f'<c:spPr><a:solidFill><a:srgbClr val="{color}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr></c:marker>'
+    )
+    serie.find(f"{{{NS_C}}}tx").addnext(linea_sp)
+    linea_sp.addnext(marcador)
+    serie.append(etree.fromstring(f'<c:smooth xmlns:c="{NS_C}" val="0"/>'))
+
+    grafico_linea = etree.fromstring(
+        f'<c:lineChart xmlns:c="{NS_C}"><c:grouping val="standard"/><c:varyColors val="0"/></c:lineChart>'
+    )
+    grafico_linea.append(serie)
+    grafico_linea.append(etree.fromstring(f'<c:marker xmlns:c="{NS_C}" val="1"/>'))
+    for eje in barras.findall(f"{{{NS_C}}}axId"):
+        grafico_linea.append(copy.deepcopy(eje))
+    barras.addnext(grafico_linea)
 
 
 def _imagen(slide, nombre: str, contenido: bytes | None) -> None:

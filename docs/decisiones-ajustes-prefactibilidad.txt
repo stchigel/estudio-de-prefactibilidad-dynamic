@@ -122,3 +122,47 @@ Frontend: lib/tipos.ts, lib/estado.ts, lib/api.ts, app/page.tsx,
           components/PasoProyecto.tsx, PasoOpciones.tsx, PasoResultados.tsx,
           SeccionPresentacion.tsx, Graficos.tsx.
 Docs:     docs/especificacion.md (secciones 5.4, 6.9, 6.10, 7, 10.2 y 14).
+
+
+######################################################################
+SEGUNDA TANDA DE AJUSTES (03/11/2026)
+######################################################################
+
+HECHO
+1) Título "Res. 281" -> "Res. 976/281" en el formulario del proyecto (el campo interno no cambia).
+
+2) Recomendada + 2 tamaños más chicos + 2 más grandes (en potencia)
+   - Se elige la recomendada (mejor ROI; ante empate de ROI < 0,2 años, la de mayor cobertura).
+   - Alrededor se toman los 2 tamaños inmediatos menores y los 2 mayores.
+   - Decisión propia: entre un tamaño y el siguiente tiene que haber al menos 15% de diferencia de potencia (si no, salían opciones casi idénticas: 99,2 / 99,8 / 104,4 kWp).
+   - Si de un lado no alcanzan (p. ej. la recomendada es la más grande por la potencia contratada), se completan con el otro lado.
+
+3) Opción destildada
+   - Interpretación: en la lista de la pantalla la fila destildada quedaba idéntica a las otras. Ahora se ve atenuada y con la insignia "Fuera del PPT".
+   - El filtrado de la tabla del PPT ya funcionaba (tiene test), así que no se tocó.
+   - SI EL PROBLEMA ERA QUE EN EL PPT LA OPCIÓN DESTILDADA SEGUÍA APARECIENDO: avisar, hay que reproducirlo.
+
+4) Kits manuales: "Calcular con estos kits" -> "Agregar a la tabla"
+   - El kit armado a mano se calcula y se suma a la tabla de opciones (insignia "Agregada a mano"), ordenada por potencia.
+   - Queda elegida al agregarla, pero se puede cambiar y se puede elegir como preferida.
+   - Se puede tildar/destildar para el PPT como las demás. Si el backend recibe un kit tildado que no salió de la búsqueda, lo calcula aparte para la tabla del PPT.
+
+5) Empate de ROI menor a 0,2: se muestran las dos
+   - Dentro de un mismo tamaño (potencia +-5%), si otra combinación tiene ROI a menos de 0,2 años de la mejor, se muestran las dos (máx. 2 por tamaño).
+   - Ejemplo del pedido: 2 x 55 kWp y 1 x 110 kWp.
+   - Consecuencia: la lista puede tener hasta 9-10 filas (5 tamaños x 2). La tabla del PPT achica filas y letra (10 pt) cuando hay más de 6 para no pisar el pie de página.
+   - En el PPT, si dos filas tienen la misma potencia, la celda de potencia agrega los kits entre paréntesis, p. ej. "110,2 (2x55,68)".
+
+6) Ahorro acumulado en el gráfico "Financiamiento: pagos vs. ahorros"
+   - Línea (no barra) de ahorro acumulado sobre las barras de pagos y ahorros. En la web (Recharts) y en el PPT (gráfico nativo combinado barras + línea).
+
+7) Gráfico semestral
+   - 14 semestres (7 años). Pagos: la cuota o los intereses de cada año se reparten mitad y mitad entre sus dos semestres; el anticipo cae en el semestre 1. Ahorro: la mitad del anual por semestre.
+   - El resultado anual (pagos/ahorros por año) se conserva para la comparación con el Excel.
+
+PENDIENTE / A CONFIRMAR
+- Item 3: confirmar la interpretación (visual en pantalla vs. PPT).
+- Item 2: confirmar que "más chicas/grandes" son tamaños realmente distintos (15%) y no los vecinos inmediatos del catálogo.
+- Item 7: si el plazo supera 7 años el gráfico no lo muestra completo (se mantiene el horizonte de 7 años acordado).
+- Sigue sin hacerse la aclaración de inyección (A7) de la primera tanda.
+- No se probó en navegador ni se vio el PPT renderizado (sin LibreOffice); se verificó por estructura y tests (160 tests del backend en verde, frontend sin errores de tipos ni lint).

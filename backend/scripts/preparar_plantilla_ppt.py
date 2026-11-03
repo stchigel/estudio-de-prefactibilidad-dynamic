@@ -173,6 +173,7 @@ def preparar(origen: Path, destino: Path) -> None:
     reemplazar(t, "564.235", "{{consumo_anual}}")
     t.name = "COND:opciones"
     forma(s[6], 26).name = "TABLA:opciones"
+    parrafo_completo(forma(s[6], 25), "Se marca la opción", "{{nota_opcion_marcada}}")
 
     # 8 · Los números
     reemplazar(forma(s[7], 2), " de la Opción recomendada", "{{titulo_numeros}}")

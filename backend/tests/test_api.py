@@ -143,3 +143,16 @@ def test_exportar_ppt_solo_con_las_opciones_tildadas():
         f.table for s in prs.slides for f in s.shapes if getattr(f, "has_table", False) and f.has_table and f.name == "TABLA:opciones"
     )
     assert len(list(tabla.rows)) == 1 + 2  # la tildada + la elegida (PLECOR de las entradas)
+
+
+def test_exportar_ppt_incluye_un_kit_agregado_a_mano():
+    from pptx import Presentation
+
+    manual = {"kit1": {"kwp": 16.24, "cantidad": 3, "distancia_tgbt_m": 0}, "kit2": None}
+    pedido = {"entradas": PLECOR["entradas"], "opciones_incluidas": [manual]}
+    r = cliente.post("/api/exportes/ppt", data={"datos": json.dumps(pedido)})
+    assert r.status_code == 200, r.text
+    prs = Presentation(io.BytesIO(r.content))
+    tabla = next(f.table for s in prs.slides for f in s.shapes if getattr(f, "has_table", False) and f.has_table and f.name == "TABLA:opciones")
+    potencias = [fila.cells[1].text for fila in list(tabla.rows)[1:]]
+    assert any(p.startswith("48,7") for p in potencias)  # 3 x 16,24 kWp
