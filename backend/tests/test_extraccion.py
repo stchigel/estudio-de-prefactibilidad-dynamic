@@ -4,6 +4,7 @@ El test `test_extraccion_real_*` llama a Claude con las facturas de ejemplo y so
 corre si hay credenciales (ANTHROPIC_API_KEY).
 """
 
+import math
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ import pytest
 from extraccion.derivados import sugerir, tasas_mun_prov
 from extraccion.esquema import FacturaExtraida, Impuesto, Jurisdiccion, MesHistorial, Numero, ProvinciaCampo, Texto, TipoDocumento
 from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_factura
+from motor.calculo import kvar_capacitores
 from motor.modelos import OrigenConsumo
 
 EJEMPLOS = Path(__file__).resolve().parents[2] / "ejemplos-facturas"
@@ -53,6 +55,7 @@ def factura_epe() -> FacturaExtraida:
         kw_registrados_fuera_pico=N(176.64),
         importe_basico_energia=N(8565172.32),
         importe_energia_activa=N(2445734.67),
+        precio_kwh_resto=N(130.5),
         impuestos=[
             Impuesto(nombre="Ley Nº 7797", jurisdiccion=Jurisdiccion.PROVINCIAL, porcentaje=6.0, base="S/Subtotal", importe=513910.34),
             Impuesto(nombre="Ordenanza Municipal Nº 1592/62", jurisdiccion=Jurisdiccion.MUNICIPAL, porcentaje=0.6, base="S/Subtotal", importe=51391.03),
@@ -63,6 +66,7 @@ def factura_epe() -> FacturaExtraida:
         ],
         importe_total=N(12960728.37),
         energia_reactiva_kvarh=N(3619.8),
+        cargo_factor_potencia=False,
         historial=[
             MesHistorial(anio=2026, mes=m, kwh_pico=p, kwh_resto=r, kwh_valle=v, kwh_total=None,
                          kw_pico=kp, kw_fuera_pico=kf, leido_de_grafico=False, confianza=1)
@@ -80,10 +84,45 @@ def test_sugerencias_epe():
     s = sugerir([factura_epe()])
     assert s.cliente == "SCIMACA S R L" and s.provincia == "Santa Fe"
     assert s.potencia_contratada_kw == 120  # A4: la mayor
-    assert s.costo_distribuidora == pytest.approx(8565172.32 / 19746.6)
+    # A6: el costo sugerido es el precio del kWh en resto, no el monómico (importe básico / kWh).
+    assert s.costo_distribuidora == pytest.approx(130.5) and s.costo_distribuidora_origen == "resto"
+    assert s.costo_monomico == pytest.approx(8565172.32 / 19746.6)
     assert s.costo_energia_activa == pytest.approx(2445734.67 / 19746.6)
     assert s.energia_reactiva_kvarh == 3619.8
+    assert not s.cargo_factor_potencia and s.kvar_sugeridos is None
     assert not s.campos_dudosos
+
+
+def test_costo_distribuidora_pondera_por_kwh_resto():
+    otra = factura_epe().model_copy(update={"precio_kwh_resto": N(100.0), "kwh_resto": N(5000.0)})
+    s = sugerir([factura_epe(), otra])
+    esperado = (130.5 * 15150.6 + 100.0 * 5000.0) / (15150.6 + 5000.0)
+    assert s.costo_distribuidora == pytest.approx(esperado)
+
+
+def test_sin_precio_en_resto_se_usa_energia_activa_y_nunca_el_monomico():
+    f = factura_epe().model_copy(update={"precio_kwh_resto": N(None)})
+    s = sugerir([f])
+    assert s.costo_distribuidora == pytest.approx(2445734.67 / 19746.6)
+    assert s.costo_distribuidora_origen == "energia_activa"
+    assert s.costo_distribuidora < s.costo_monomico / 3
+
+
+def test_cargo_por_factor_de_potencia_sugiere_banco_de_capacitores():
+    f = factura_epe().model_copy(update={"cargo_factor_potencia": True})
+    s = sugerir([f])
+    assert s.cargo_factor_potencia
+    # [Bco Capac!C18]: Qc = P · (tan φ − tan φ_obj), P = 120 kW (la mayor), cos φ objetivo 0,95
+    tan_objetivo = math.tan(math.acos(0.95))
+    esperado = 120 * (3619.8 / 19746.6 - tan_objetivo)
+    assert s.kvar_sugeridos == pytest.approx(max(esperado, 0), abs=0.05)
+
+
+def test_kvar_replica_la_hoja_bco_capac():
+    # Hoja "Bco Capac": activa 30900, reactiva 12810, 75 kW → Qc = 75·(tan φ − tan φ_obj)
+    assert kvar_capacitores(75, 30900, 12810) == pytest.approx(75 * (12810 / 30900 - math.tan(math.acos(0.95))))
+    assert kvar_capacitores(75, 30900, 0) == 0  # sin reactiva no hay nada que compensar
+    assert kvar_capacitores(0, 30900, 12810) == 0
 
 
 def test_consumos_epe_completa_con_espejo():

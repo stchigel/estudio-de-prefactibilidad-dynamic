@@ -67,8 +67,15 @@ def validar(e: Entradas, cat: Catalogo, par: Parametros) -> list[Alerta]:
 
     alertas += _validar_baterias(e, cat)
 
-    if e.financiacion.porcentaje > 0 and e.financiacion.plazo_anios <= 0:
-        error("plazo_financiacion", "Con monto a financiar el plazo debe ser mayor a 0", "financiacion.plazo_anios")
+    if e.financiacion.porcentaje > 0:
+        if e.financiacion.plazo_anios <= 0:
+            error("plazo_financiacion", "Con monto a financiar el plazo debe ser mayor a 0", "financiacion.plazo_anios")
+        elif e.financiacion.gracia_anios >= e.financiacion.plazo_anios:
+            error(
+                "gracia_financiacion",
+                "El plazo es el total de la financiación: tiene que ser mayor que los años de gracia",
+                "financiacion.plazo_anios",
+            )
 
     estimados = [par.meses[i] for i, c in enumerate(e.consumos) if c.origen == OrigenConsumo.ESTIMADO]
     if estimados:

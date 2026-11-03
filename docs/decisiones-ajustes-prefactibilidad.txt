@@ -1,0 +1,124 @@
+AJUSTES DEL ÁREA DE PREFACTIBILIDAD - DECISIONES Y PENDIENTES
+Fecha: 03/11/2026
+Estado del código: implementado y probado, sin commitear.
+Tests: 154 del backend en verde; frontend sin errores de tipos ni lint.
+No se abrió la app en el navegador ni se renderizó el PPT (no hay LibreOffice): el PPT se verificó solo de forma estructural.
+
+======================================================================
+1. LO QUE SE HIZO Y LAS DECISIONES TOMADAS
+======================================================================
+
+1) Factor de potencia -> banco de capacitores
+   - La extracción de facturas lee un campo nuevo: cargo_factor_potencia (sí/no).
+   - Si la factura cobra ese cargo, el formulario activa el banco de capacitores y precarga los kVAr.
+   - Cálculo de kVAr (hoja Bco Capac del Excel): Qc = P x (tan φ - tan φ objetivo).
+       * P = potencia contratada.
+       * tan φ = energía reactiva / energía activa de la factura más reciente.
+       * cos φ objetivo = 0,95.
+   - Respuesta del usuario: "Activar y calcular kVAr". La inversión (U$D) y el ahorro ($/año) del banco siguen siendo manuales.
+   - Se muestra un aviso en el formulario explicando por qué se recomendó.
+
+2) Inyección como parte del ahorro
+   - NO SE HIZO. Ver sección 2 (pendiente A7).
+
+3) Monómico vs. costo del kWh en resto
+   - El costo de distribuidora sugerido ya no es el monómico (importe básico / kWh).
+   - Ahora es el precio unitario del kWh en la franja resto, que la IA lee de la factura (campo nuevo: precio_kwh_resto).
+   - Con varias facturas se hace un promedio ponderado por kWh de resto.
+   - Si la factura no trae ese precio, se cae a energía activa / kWh y el formulario avisa para revisar.
+   - El monómico se sigue calculando solo como dato informativo, nunca se usa.
+   - Decisión: se tomó "precio unitario en resto" como interpretación de "solo el costo por kWh en resto".
+
+4) Gráfico de ROI
+   - Es dinámico: años 1 hasta min(25, max(8, ROI redondeado hacia arriba + 5)).
+   - Si no hay repago, muestra 15 años.
+   - Aplica a la web y al PowerPoint.
+   - Decisión: se eligió la opción "dinámico según cada caso" y no la fija de 1 a 15.
+
+5) Período de financiación = total
+   - El plazo es el total, con la gracia incluida. Ejemplo: 5 años con 1 de gracia = 1 año de solo intereses + 4 de capital más intereses.
+   - El formulario dice "Plazo total" y muestra el desglose.
+   - Es error que la gracia sea igual o mayor al plazo.
+   - Los textos del PPT ("5 años (4 años de capital más intereses y 1 año de gracia, solo intereses)") se adaptaron.
+
+6) Primer año solo intereses
+   - Respuesta del usuario: "Solo si hay gracia".
+   - Los años de gracia pagan solo intereses sobre el monto financiado, sin capitalizarlos.
+   - Después vienen las cuotas de capital más intereses (sistema francés mensual sobre plazo - gracia).
+   - Sin gracia, el año 1 paga cuota completa.
+   - El año 1 incluye además el anticipo (la parte no financiada).
+   - Decisión propia: los intereses de gracia se calculan con tasa + gastos administrativos, igual que las cuotas. (La planilla usaba solo la tasa.)
+
+7) Selector de páginas del PowerPoint
+   - Checkbox por cada una de las 16 diapositivas, con botones "Todas" y "Ninguna".
+   - Las condicionales (7 opciones, 10 financiación propia, 11 bancaria) se omiten solas si no corresponden, aunque estén activadas.
+   - Reemplaza el viejo interruptor "Incluir tabla de opciones".
+
+8) Tildar las opciones
+   - Respuesta del usuario: "Elegir cuáles van al PPT".
+   - Cada opción tiene un checkbox "En el PPT"; las tildadas forman la tabla de opciones de la presentación.
+   - La opción elegida siempre va incluida (su checkbox queda bloqueado).
+   - Por defecto están todas tildadas.
+
+9) Más opciones (alrededor de 5)
+   - El máximo pasó de 4 a 5.
+   - Si con el salto de cobertura del 10% no se llega a 5 (por ejemplo, cuando la potencia contratada limita la cobertura), el salto se achica a la mitad hasta un mínimo de 2,5%.
+   - En PLECOR se pasó de 3 a 5 opciones.
+   - La tabla de la plantilla admite hasta 6 filas, por lo que 5 entran.
+
+10) Texto CFI
+   - El usuario respondió que no entendía la diferencia entre las alternativas planteadas, así que la decisión la tomé yo.
+   - Interpretación: faltaba el bloque "CFI" de la diapositiva de financiación propia. Ese bloque está en los 3 PPT de ejemplo, pero lo había quitado yo al armar la plantilla.
+   - Se restauró el bloque y se agregó un campo "Texto CFI" en la sección Presentación, editable, una línea por renglón.
+   - Viene precargado con el texto de los PPT de ejemplo. Si se vacía, el bloque no aparece.
+   - La diapositiva de financiación bancaria (11) sigue siendo aparte y opcional, con su propio campo.
+
+======================================================================
+2. LO QUE QUEDÓ SIN HACER O PENDIENTE
+======================================================================
+
+A) Inyección como parte del ahorro (pendiente A7, anotado en docs/especificacion.md)
+   - Hoy el ahorro anual ya suma energía inyectada x retribución, pero solo si la inhibición de inyección es NO y la "Retribución por inyección" ($/kWh) es mayor que 0.
+   - El usuario pidió anotarlo como pendiente, a la espera de aclaración.
+   - Preguntas para el área de prefactibilidad:
+       * ¿Quieren que se sume la inyección aunque la inhibición esté en SI?
+       * ¿El problema es que la retribución viene en 0 y hay que precargarla o extraerla de la factura?
+       * ¿Solo falta mostrar el ahorro por inyección desglosado (panel, tabla de opciones, PPT)?
+
+B) Verificaciones que faltan
+   - Probar la extracción con una factura real: el prompt ahora pide precio_kwh_resto y cargo_factor_potencia, pero solo se probó con datos armados a mano.
+   - Abrir la app en el navegador y revisar la interfaz nueva (checkboxes de opciones, selector de páginas, campos CFI).
+   - Revisar visualmente el PPT generado (en particular el bloque CFI, el gráfico ROI con distinta cantidad de años y la tabla con 5 opciones).
+   - Los PPT se verificaron solo por estructura; no hay LibreOffice instalado para renderizarlos.
+
+C) Cosas a confirmar con el área
+   - El texto CFI precargado trae datos de los ejemplos (tasa 21%, máximo 500 M$ar, Tamar + 2pp) que pueden estar desactualizados.
+   - Que "precio del kWh en resto" sea lo que querían decir con "solo el costo por kWh en resto".
+   - Que la interpretación del texto CFI (bloque de la diapositiva de financiación propia) sea la correcta.
+   - Que los intereses de gracia usen tasa + gastos administrativos.
+
+D) Fuera de lo pedido que quedó igual
+   - La inversión y el ahorro del banco de capacitores no se estiman: siguen siendo carga manual.
+   - La financiación sigue mostrando 7 años en el gráfico.
+   - Nada fue commiteado.
+
+======================================================================
+3. DIFERENCIA CONOCIDA CON EL EXCEL
+======================================================================
+Con gracia mayor que 0, el Excel exportado NO va a dar los mismos pagos de financiación que el sistema, porque la planilla capitaliza la gracia sobre el saldo y el sistema no.
+   - Al exportar se escribe N44 = plazo - gracia (años de amortización) y Q44 = gracia.
+   - Sin gracia, los resultados coinciden con el Excel.
+   - Está documentado como diferencias intencionales #5 y #6 en docs/especificacion.md (sección 6.10).
+   - Si se prefiere que el Excel coincida, habría que cambiar la fórmula de la planilla.
+
+======================================================================
+4. ARCHIVOS PRINCIPALES TOCADOS
+======================================================================
+Backend:  motor/calculo.py, motor/modelos.py, motor/opciones.py, motor/validaciones.py,
+          extraccion/esquema.py, extraccion/extractor.py, extraccion/derivados.py,
+          exportes/powerpoint.py, exportes/excel.py, exportes/plantillas/prefactibilidad.pptx,
+          scripts/preparar_plantilla_ppt.py, api/main.py y los tests correspondientes.
+Frontend: lib/tipos.ts, lib/estado.ts, lib/api.ts, app/page.tsx,
+          components/PasoProyecto.tsx, PasoOpciones.tsx, PasoResultados.tsx,
+          SeccionPresentacion.tsx, Graficos.tsx.
+Docs:     docs/especificacion.md (secciones 5.4, 6.9, 6.10, 7, 10.2 y 14).

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import { fmt } from "@/lib/estado";
-import type { Entradas, Resultado } from "@/lib/tipos";
+import type { Entradas, KitsOpcion, OpcionesFormulario, Resultado } from "@/lib/tipos";
 import { GraficoFinanciacion, GraficoMensual, GraficoRoi } from "./Graficos";
 import { describirKits } from "./PasoOpciones";
 import { SeccionPresentacion } from "./SeccionPresentacion";
@@ -21,11 +21,15 @@ function Kpi({ etiqueta, valor, detalle }: { etiqueta: string; valor: string; de
 
 export function PasoResultados({
   e,
+  opciones,
+  opcionesPpt,
   alCambiar,
   alVolver,
   alNueva,
 }: {
   e: Entradas;
+  opciones: OpcionesFormulario;
+  opcionesPpt: KitsOpcion[] | null;
   alCambiar: (c: Partial<Entradas>) => void;
   alVolver: () => void;
   alNueva: () => void;
@@ -166,7 +170,7 @@ export function PasoResultados({
             </Seccion>
           </div>
 
-          <SeccionPresentacion e={e} />
+          <SeccionPresentacion e={e} diapositivas={opciones.diapositivas} opcionesPpt={opcionesPpt} />
         </>
       )}
 

@@ -15,9 +15,12 @@ class ConfigBusqueda:
     max_desperdicio_inhibido: float = 0.15
     # Diferencias de ROI menores a esta se consideran empate y gana la mayor cobertura.
     tolerancia_roi_anios: float = 0.2
-    max_opciones: int = 4
-    # Salto mínimo de cobertura entre opciones presentadas (escalonado).
+    max_opciones: int = 5
+    # Salto mínimo de cobertura entre opciones presentadas (escalonado). Si con ese salto no se
+    # llega a `max_opciones` (rango de cobertura angosto, p. ej. por la potencia contratada),
+    # se achica a la mitad hasta `salto_cobertura_minimo`.
     salto_cobertura: float = 0.10
+    salto_cobertura_minimo: float = 0.02
     # Tope de cobertura cuando no hay potencia contratada informada.
     cobertura_max_sin_potencia: float = 1.0
 
@@ -121,13 +124,17 @@ def _motivo_descarte(c: Candidata, e: Entradas, cfg: ConfigBusqueda, controlar_p
 
 def _escalonar(ranking: list[Candidata], cfg: ConfigBusqueda) -> list[Candidata]:
     """La mejor por ROI + las siguientes mejores separadas por al menos un salto de cobertura."""
-    elegidas: list[Candidata] = []
-    for c in ranking:
-        if all(abs(c.cobertura - x.cobertura) >= cfg.salto_cobertura for x in elegidas):
-            elegidas.append(c)
-        if len(elegidas) == cfg.max_opciones:
-            break
-    return elegidas
+    salto = cfg.salto_cobertura
+    while True:
+        elegidas: list[Candidata] = []
+        for c in ranking:
+            if all(abs(c.cobertura - x.cobertura) >= salto for x in elegidas):
+                elegidas.append(c)
+            if len(elegidas) == cfg.max_opciones:
+                return elegidas
+        if salto / 2 < cfg.salto_cobertura_minimo:
+            return elegidas
+        salto /= 2
 
 
 def buscar_opciones(

@@ -95,8 +95,21 @@ class FacturaExtraida(BaseModel):
     importe_energia_activa: Numero = Field(
         description="Solo los cargos por energía activa consumida ($), sin cargos fijos ni de potencia"
     )
+    precio_kwh_resto: Numero = Field(
+        description=(
+            "Precio unitario ($/kWh) de la energía en la franja resto, tal como figura en el renglón de "
+            "energía, sin impuestos. Si la tarifa no discrimina franjas, el precio unitario de la energía. "
+            "Null si no figura: no lo calcules dividiendo importes"
+        )
+    )
     impuestos: list[Impuesto]
     importe_total: Numero
     energia_reactiva_kvarh: Numero
+    cargo_factor_potencia: bool = Field(
+        description=(
+            "True si la factura cobra un cargo, recargo o penalidad por factor de potencia (coseno phi) "
+            "como renglón de importe. False si no aparece o si solo informa el valor sin cobrarlo"
+        )
+    )
     historial: list[MesHistorial]
     notas: str = Field(description="Observaciones para quien revisa: datos ilegibles, ambigüedades, formato raro")

@@ -1,6 +1,7 @@
 import type {
   Alerta,
   Entradas,
+  KitsOpcion,
   OpcionesFormulario,
   RespuestaExtraccion,
   Resultado,
@@ -74,12 +75,25 @@ export const api = {
   },
   async exportarPpt(
     e: Entradas,
-    opciones: { incluirOpciones: boolean; textoBancario: string; imagenes: Partial<Record<"logo" | "planta" | "montaje", File>> },
+    opciones: {
+      /** Opciones tildadas para la tabla; null = todas las de la búsqueda. */
+      opcionesIncluidas: KitsOpcion[] | null;
+      diapositivasExcluidas: number[];
+      textoBancario: string;
+      textoCfi: string;
+      imagenes: Partial<Record<"logo" | "planta" | "montaje", File>>;
+    },
   ): Promise<void> {
     const datos = new FormData();
     datos.append(
       "datos",
-      JSON.stringify({ entradas: e, incluir_opciones: opciones.incluirOpciones, texto_bancario: opciones.textoBancario || null }),
+      JSON.stringify({
+        entradas: e,
+        opciones_incluidas: opciones.opcionesIncluidas,
+        diapositivas_excluidas: opciones.diapositivasExcluidas,
+        texto_bancario: opciones.textoBancario || null,
+        texto_cfi: opciones.textoCfi || null,
+      }),
     );
     for (const [nombre, archivo] of Object.entries(opciones.imagenes)) if (archivo) datos.append(nombre, archivo);
     let r: Response;

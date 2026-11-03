@@ -6,6 +6,7 @@ contra el valor corregido.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,9 @@ PERIODOS = [5, 6, 7, 8, 9, 10, 15, 25]
 def _cargar(ruta: Path):
     datos = json.loads(ruta.read_text(encoding="utf-8"))
     entradas = entradas_desde_dict(datos["entradas"])
+    # El JSON guarda el N44 de la planilla (años de amortización); en el sistema el plazo es el total.
+    f = entradas.financiacion
+    entradas = replace(entradas, financiacion=replace(f, plazo_anios=f.plazo_anios + f.gracia_anios))
     return entradas, calcular(entradas), datos["excel"]
 
 
@@ -118,8 +122,22 @@ def test_financiacion(caso):
         assert x["canon"] is None
         assert r.financiacion.canon_anual == 0
         return
-    igual(r.financiacion.canon_anual, x["canon"])
-    igual(r.financiacion.pagos, x["pagos_financiacion"])
+    f = e.financiacion
+    if f.gracia_anios == 0:
+        igual(r.financiacion.canon_anual, x["canon"])
+        igual(r.financiacion.pagos, x["pagos_financiacion"])
+        return
+
+    # Diferencia intencional (§6.10 #6): la planilla capitaliza la gracia en el saldo; el sistema
+    # paga solo intereses durante la gracia y amortiza el monto financiado sin capitalizar.
+    i, n = f.tasa + f.gastos_adm, f.plazo_anios - f.gracia_anios
+    financiado = r.financiacion.monto_financiado
+    canon = 12 * financiado * (i / 12) / (1 - (1 + i / 12) ** (-12 * n))
+    igual(r.financiacion.canon_anual, canon)
+    anticipo = r.inversion.total_usd - financiado
+    esperados = [anticipo + (financiado * i if f.gracia_anios >= 1 else canon)]
+    esperados += [financiado * i if k <= f.gracia_anios else canon if k <= f.plazo_anios else 0.0 for k in range(2, 8)]
+    igual(r.financiacion.pagos, esperados)
 
 
 def test_huella(caso):

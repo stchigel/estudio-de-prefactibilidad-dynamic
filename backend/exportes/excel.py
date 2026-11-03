@@ -112,7 +112,7 @@ def celdas_entrada(e: Entradas) -> dict[str, Any]:
         "F44": f.porcentaje,
         "H44": f.tipo.value,
         "K44": f.moneda.value,
-        "N44": f.plazo_anios,
+        "N44": max(f.plazo_anios - f.gracia_anios, 0),  # la planilla pide los años de amortización
         "Q44": f.gracia_anios,
         "E46": f.tasa,
         "F46": f.gastos_adm,
@@ -209,7 +209,7 @@ def leer_entradas(ruta: Path) -> Entradas:
             porcentaje=float(v("F44")),
             tipo=TipoFinanciacion(v("H44")),
             moneda=Moneda(v("K44")),
-            plazo_anios=int(v("N44")),
+            plazo_anios=int(v("N44")) + int(v("Q44")),
             gracia_anios=int(v("Q44")),
             tasa=float(v("E46")),
             gastos_adm=float(v("F46")),

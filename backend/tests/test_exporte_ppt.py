@@ -8,7 +8,7 @@ from PIL import Image
 from pptx import Presentation
 
 from casos.definiciones import plecor
-from exportes.powerpoint import DatosPpt, OpcionPpt, generar_ppt, numero
+from exportes.powerpoint import DIAPOSITIVAS, DatosPpt, OpcionPpt, generar_ppt, numero
 from motor import calcular
 from motor.modelos import Capacitores, Financiacion, OrigenConsumo
 from motor.opciones import buscar_opciones
@@ -107,7 +107,8 @@ def test_graficos_nativos(simple):
     prs, _ = _generar(DatosPpt(e, r))
     graficos = {f.name: f.chart for s in prs.slides for f in _formas(s) if getattr(f, "has_chart", False) and f.has_chart}
     roi = list(graficos["GRAFICO:roi"].plots[0].series[0].values)
-    assert roi == pytest.approx(r.curva_roi[:15])
+    assert len(roi) == r.anios_curva_roi == 10  # ROI 4,33 → ROI + 5 años, no 15 fijos
+    assert roi == pytest.approx(r.curva_roi[: r.anios_curva_roi])
     fin = graficos["GRAFICO:financiacion"].plots[0].series
     assert list(fin[0].values) == pytest.approx(r.financiacion.pagos)
     assert list(fin[1].values) == pytest.approx(r.financiacion.ahorros)
@@ -142,3 +143,69 @@ def test_imagenes(simple):
     assert imagenes(con, 1) == imagenes(sin, 1) + 1
     assert not any(f.name == "IMG:logo" for f in _formas(con.slides[0]))  # el rótulo se reemplaza
     assert any(f.name == "IMG:logo" for f in _formas(sin.slides[0]))  # sin imagen queda el marcador
+
+
+def test_el_grafico_roi_se_adapta_a_cada_caso():
+    from motor.calculo import anios_curva_roi
+
+    assert anios_curva_roi(1.2) == 8  # mínimo
+    assert anios_curva_roi(4.33) == 10
+    assert anios_curva_roi(9.5) == 15
+    assert anios_curva_roi(22.0) == 25  # tope: la vida útil
+    assert anios_curva_roi(None) == 15  # sin repago
+
+
+def test_selector_de_paginas(simple):
+    e, r = simple
+    prs, textos = _generar(DatosPpt(e, r, diapositivas_excluidas=frozenset({6, 12, 14})))
+    assert len(prs.slides) == 11
+    todo = "\n".join(textos)
+    for ausente in ("PREVISIBILIDAD", "BENEFICIOS FISCALES", "POSICIONAMIENTO"):
+        assert ausente not in todo
+    assert "IMPACTO AMBIENTAL" in todo
+
+
+def test_el_selector_cubre_las_diapositivas_de_la_plantilla():
+    from pptx import Presentation as P
+    from exportes.powerpoint import PLANTILLA
+
+    assert [d.numero for d in DIAPOSITIVAS] == list(range(1, len(P(PLANTILLA).slides) + 1))
+
+
+def test_diapositiva_condicional_desactivada_no_se_genera(simple):
+    e, r = simple
+    prs, textos = _generar(DatosPpt(e, r, diapositivas_excluidas=frozenset({10})))  # financiamiento propio
+    assert len(prs.slides) == 13 and "FINANCIAMIENTO" not in "\n".join(textos)
+
+
+def test_bloque_cfi_con_varias_lineas(simple):
+    e, r = simple
+    cfi = "Plazos hasta 60 meses con 1 año de gracia\n1% de gastos administrativos\nHasta el 80% de la inversión"
+    prs, textos = _generar(DatosPpt(e, r, texto_cfi=cfi))
+    financiamiento = textos[8]
+    assert "CFI" in financiamiento
+    assert all(linea in financiamiento for linea in cfi.splitlines())
+    assert "{{" not in financiamiento
+
+    prs, textos = _generar(DatosPpt(e, r))  # sin texto CFI el bloque se oculta
+    assert "CFI" not in textos[8]
+
+
+def test_texto_de_financiacion_con_plazo_total_y_gracia(simple):
+    e, r = simple  # PLECOR: 80 %, plazo 4 con 1 de gracia en la definición del caso
+    fin = replace(e, financiacion=Financiacion(0.8, plazo_anios=5, gracia_anios=1, tasa=0.02, gastos_adm=0.01))
+    _, textos = _generar(DatosPpt(fin, calcular(fin)))
+    t = textos[8]
+    assert "5 años (4 años de capital más intereses y 1 año de gracia, solo intereses)" in t
+    assert "1 año de solo intereses y 48 cuotas mensuales" in t
+    assert "5 años en USD" in t
+
+
+def test_tabla_de_opciones_con_las_tildadas():
+    e = plecor()
+    b = buscar_opciones(e)
+    assert len(b.opciones) == 5
+    opciones = [OpcionPpt(o.kit1, o.kit2, o.recomendada, o.resultado) for o in b.opciones]
+    prs, _ = _generar(DatosPpt(e, opciones[-1].resultado, opciones))
+    tabla = next(f.table for s in prs.slides for f in _formas(s) if f.name == "TABLA:opciones")
+    assert len(list(tabla.rows)) == 6

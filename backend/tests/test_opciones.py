@@ -32,7 +32,7 @@ def test_combinaciones_respetan_tope_y_orden_de_kits():
 
 def test_busqueda_plecor():
     r = buscar_opciones(plecor())
-    assert 1 <= len(r.opciones) <= 4
+    assert 1 <= len(r.opciones) <= 5
     assert sum(o.recomendada for o in r.opciones) == 1
     coberturas = [o.resultado.energia.cobertura for o in r.opciones]
     assert coberturas == sorted(coberturas)

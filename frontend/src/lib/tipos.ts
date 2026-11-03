@@ -117,6 +117,7 @@ export interface Resultado {
   inversion: { total_usd: number; paneles_usd: number; baterias_usd: number; cable_usd: number; capacitores_usd: number };
   roi_anios: number | null;
   curva_roi: number[];
+  anios_curva_roi: number;
   van_tir: { van: number; tir: number | null; van_por_periodo: Record<string, number> };
   ppa: { tir: number | null; ventas_anio1_usd: number };
   financiacion: { monto_financiado: number; canon_anual: number; pagos: number[]; ahorros: number[] };
@@ -161,6 +162,8 @@ export interface FacturaExtraida {
   kwh_total: CampoConfianza<number>;
   importe_basico_energia: CampoConfianza<number>;
   importe_energia_activa: CampoConfianza<number>;
+  precio_kwh_resto: CampoConfianza<number>;
+  cargo_factor_potencia: boolean;
   importe_total: CampoConfianza<number>;
   energia_reactiva_kvarh: CampoConfianza<number>;
   notas: string;
@@ -176,7 +179,11 @@ export interface Sugerencias {
   potencia_contratada_kw: number | null;
   potencias_contratadas: (number | null)[];
   costo_distribuidora: number | null;
+  costo_distribuidora_origen: "resto" | "energia_activa" | null;
   costo_energia_activa: number | null;
+  costo_monomico: number | null;
+  cargo_factor_potencia: boolean;
+  kvar_sugeridos: number | null;
   tasas_mun_prov: number | null;
   energia_reactiva_kvarh: number | null;
   consumos: (ConsumoMensual | null)[];
@@ -189,7 +196,21 @@ export interface RespuestaExtraccion {
   sugerencias: Sugerencias;
 }
 
+export interface DiapositivaPpt {
+  numero: number;
+  titulo: string;
+  condicion: string | null;
+  nota: string;
+}
+
+/** Kits de una opción de la lista, tal como los espera el exporte de PowerPoint. */
+export interface KitsOpcion {
+  kit1: Kit;
+  kit2: Kit | null;
+}
+
 export interface OpcionesFormulario {
+  diapositivas: DiapositivaPpt[];
   provincias: string[];
   acimuts: number[];
   inclinaciones: number[];

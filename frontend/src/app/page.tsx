@@ -18,7 +18,7 @@ import {
   PASOS,
   type Paso,
 } from "@/lib/estado";
-import type { Entradas, OpcionesFormulario, RespuestaExtraccion } from "@/lib/tipos";
+import type { Entradas, KitsOpcion, OpcionesFormulario, RespuestaExtraccion } from "@/lib/tipos";
 
 const sinSuscripcion = () => () => {};
 
@@ -33,6 +33,7 @@ function Asistente() {
   const [paso, setPaso] = useState<Paso>(borrador?.paso ?? "Facturas");
   const [entradas, setEntradas] = useState<Entradas>(() => ({ ...entradasIniciales(), ...borrador?.entradas }));
   const [extraccion, setExtraccion] = useState<RespuestaExtraccion | null>(borrador?.extraccion ?? null);
+  const [opcionesPpt, setOpcionesPpt] = useState<KitsOpcion[] | null>(borrador?.opcionesPpt ?? null);
   const [archivos, setArchivos] = useState<File[]>([]);
   const [opciones, setOpciones] = useState<OpcionesFormulario | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -45,8 +46,8 @@ function Asistente() {
   }, []);
 
   useEffect(() => {
-    guardarBorrador({ paso, entradas, extraccion });
-  }, [paso, entradas, extraccion]);
+    guardarBorrador({ paso, entradas, extraccion, opcionesPpt });
+  }, [paso, entradas, extraccion, opcionesPpt]);
 
   const actualizar = useCallback((c: Partial<Entradas>) => setEntradas((e) => ({ ...e, ...c })), []);
   const indice = PASOS.indexOf(paso);
@@ -56,6 +57,7 @@ function Asistente() {
     borrarBorrador();
     setEntradas(entradasNuevoAnalisis);
     setExtraccion(null);
+    setOpcionesPpt(null);
     setArchivos([]);
     setPaso("Facturas");
   };
@@ -134,6 +136,7 @@ function Asistente() {
         <PasoProyecto
           e={entradas}
           opciones={opciones}
+          sugerencias={extraccion?.sugerencias ?? null}
           alCambiar={actualizar}
           alContinuar={() => setPaso("Opciones")}
           alVolver={() => setPaso("Consumos")}
@@ -143,15 +146,23 @@ function Asistente() {
         <PasoOpciones
           e={entradas}
           opciones={opciones}
-          alElegir={(kit1, kit2) => {
+          alElegir={(kit1, kit2, tildadas) => {
             actualizar({ kit1, kit2 });
+            setOpcionesPpt(tildadas);
             setPaso("Resultados");
           }}
           alVolver={() => setPaso("Proyecto")}
         />
       )}
-      {paso === "Resultados" && (
-        <PasoResultados e={entradas} alCambiar={actualizar} alVolver={() => setPaso("Opciones")} alNueva={nueva} />
+      {paso === "Resultados" && opciones && (
+        <PasoResultados
+          e={entradas}
+          opciones={opciones}
+          opcionesPpt={opcionesPpt}
+          alCambiar={actualizar}
+          alVolver={() => setPaso("Opciones")}
+          alNueva={nueva}
+        />
       )}
     </div>
   );

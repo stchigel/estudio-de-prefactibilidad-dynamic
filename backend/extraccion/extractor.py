@@ -56,6 +56,8 @@ pico/resto/valle en null y completá solo kwh_total.
 - importe_basico_energia: el importe básico o subtotal del servicio antes de tasas, \
 contribuciones e impuestos. importe_energia_activa: solo los renglones de energía \
 activa consumida (sin cargo comercial/fijo ni cargos por capacidad o potencia).
+- precio_kwh_resto: el precio unitario por kWh de la energía en la franja resto (sin impuestos), como figura en su renglón. No uses el importe total ni el básico dividido por los kWh: eso incluye cargos fijos y de potencia que la generación solar no reduce.
+- cargo_factor_potencia: true solo si hay un renglón que cobra cargo o recargo por factor de potencia (coseno phi bajo). Si el factor de potencia solo se informa, o no figura, false.
 - impuestos: cada renglón de tasa, contribución, ley u ordenanza e IVA, con su \
 alícuota en % si figura. Jurisdicción: "municipal" para ordenanzas y tasas \
 municipales, "provincial" para leyes y fondos provinciales, "nacional" para leyes \

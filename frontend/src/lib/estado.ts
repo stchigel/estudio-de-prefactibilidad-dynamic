@@ -1,4 +1,4 @@
-import type { ConsumoMensual, Entradas, RespuestaExtraccion } from "./tipos";
+import type { ConsumoMensual, Entradas, KitsOpcion, RespuestaExtraccion } from "./tipos";
 
 export const MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
@@ -84,6 +84,8 @@ export interface Borrador {
   paso: Paso;
   entradas: Entradas;
   extraccion: RespuestaExtraccion | null;
+  /** Opciones tildadas para la tabla del PowerPoint; null = todas. */
+  opcionesPpt?: KitsOpcion[] | null;
 }
 
 const CLAVE = "prefactibilidad:borrador";
@@ -116,8 +118,13 @@ export function borrarBorrador(): void {
 /** Aplica las sugerencias extraídas de las facturas a las entradas (§5.4). */
 export function aplicarSugerencias(e: Entradas, r: RespuestaExtraccion): Entradas {
   const s = r.sugerencias;
+  // Un cargo por factor de potencia en la factura recomienda automáticamente el banco de capacitores.
+  const capacitores = s.cargo_factor_potencia
+    ? { banco_capacitores: true, capacitores: { ...e.capacitores, kvar: s.kvar_sugeridos ?? e.capacitores.kvar } }
+    : {};
   return {
     ...e,
+    ...capacitores,
     cliente: s.cliente ?? e.cliente,
     provincia: s.provincia ?? e.provincia,
     distribuidora: s.distribuidora ?? e.distribuidora,

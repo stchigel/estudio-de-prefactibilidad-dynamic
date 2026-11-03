@@ -106,7 +106,8 @@ Notas por formato observado:
 3. Todo valor estimado se marca visualmente como **"estimado"**.
 
 ### 5.4 Datos derivados de la factura
-- **Costo distribuidora $/kWh** (Hoja1!E11) = importe básico de energía ÷ kWh facturados (promedio ponderado de los meses disponibles). Editable.
+- **Costo distribuidora $/kWh** (Hoja1!E11) = **precio unitario del kWh en la franja resto** de la factura (promedio ponderado por kWh de resto). NO se usa el monómico (importe básico ÷ kWh), que incluye cargos fijos y de potencia que la solar no reduce. Si la factura no trae el precio en resto, se cae a energía activa ÷ kWh (se avisa en el formulario). Editable.
+- **Banco de capacitores**: si la factura trae un cargo por factor de potencia (`cargo_factor_potencia`), el formulario activa el banco y precarga los kVAr (Bco Capac: Qc = P·(tan φ − tan φ_obj), P = potencia contratada, cos φ objetivo 0,95). Inversión y ahorro se completan a mano.
 - **Tasas mun/prov** (Hoja1!I11) = suma de % de impuestos provinciales/municipales sobre subtotal. Editable.
 
 ### 5.5 Pantalla de revisión
@@ -260,6 +261,7 @@ factor: Coplanar = 2,9 · Engrafado = 2,9 · Losa = 3,5 · Piso = 5
 ```
 Capital[1] = Ahorro_USD − Inversión ;  Capital[k] = Capital[k−1] + Ahorro_USD
 ROI_años   = interpolación lineal del cruce por cero  (≡ Inversión / Ahorro_USD)
+Gráfico    = años 1 .. min(25, max(8, ⌈ROI⌉ + 5))   (dinámico según el caso; 15 si no hay repago)
 ```
 
 **VAN / TIR** — tal como está en el Excel (confirmado):
@@ -281,14 +283,13 @@ TIR_PPA     = IRR(Flujo[1..período_contrato])
 Ventas_año1 = precio_MWh · Autoconsumo / 1000
 ```
 
-**Financiación** (hoja Financiación, 7 años fijos — confirmado):
+**Financiación** (7 años de gráfico; el plazo es el **total**, gracia incluida):
 ```
 Financiado = Inversión · %financiar ;  i = tasa + gastos_adm ;  r = i / 12
-Canon      = 12 · Financiado · (1 + gracia · i) · r / (1 − (1 + r)^(−12·plazo))
-Pago[1]    = gracia > 0 ? (Inversión − Financiado) + Financiado · tasa
-                        : (Inversión − Financiado) + Canon
-Pago[2]    = gracia > 1 ? Financiado · tasa : (gracia + plazo < 2 ? 0 : Canon)
-Pago[k≥3]  = gracia > k−1 ? 0 : (gracia + plazo < k ? 0 : Canon)
+Amortiza   = plazo − gracia                      (5 con 1 de gracia = 1 de solo intereses + 4 de capital)
+Canon      = 12 · Financiado · r / (1 − (1 + r)^(−12·Amortiza))      (sin capitalizar la gracia)
+Pago[k]    = k ≤ gracia ? Financiado · i : (k ≤ plazo ? Canon : 0)
+Pago[1]   += Inversión − Financiado              (anticipo)
 Ahorro[k]  = Ahorro_USD (constante, k = 1..7)
 ```
 
@@ -316,6 +317,9 @@ Qc_kVAr = P · (tan φ − tan φ_obj)
 | 3 | Hoja ROI tiene tabla con inflación 6 % (M:P) | No se usa | Confirmado: solo tabla sin inflación |
 | 4 | La capacidad de baterías reduce la inyección aunque sea ON GRID / baterías = NO | En la UI no se puede combinar ON GRID con baterías; sin baterías `cap_bat = 0` | Confirmado |
 
+| 5 | Planilla: `N44` = años de amortización, la gracia se suma aparte | El plazo es el total (gracia incluida) | Pedido de prefactibilidad. Al exportar se escribe `N44 = plazo − gracia` |
+| 6 | Planilla capitaliza la gracia (`Financiado·(1 + gracia·i)`) | Gracia = solo intereses, sin capitalizar | Pedido de prefactibilidad. Con gracia > 0 el Excel exportado da otros pagos |
+
 Se recomienda aplicar también #2 en la planilla para que el Excel exportado coincida con el sistema.
 
 ---
@@ -329,8 +333,8 @@ Se recomienda aplicar también #2 en la planilla para que el Excel exportado coi
    - generen excedente inyectado desproporcionado con inhibición = SI (umbral configurable).
 3. Calcular cada combinación con el motor completo.
 4. Ordenar por **ROI** (menor = mejor). Desempate: mayor cobertura cuando la diferencia de ROI < 0,2 años (configurable).
-5. Presentar 3–4 opciones escalonadas por cobertura; marcar la **recomendada** (mejor ROI).
-6. El usuario puede **elegir otra manualmente** o editar una opción. La opción elegida alimenta las diapositivas de "los números", ROI y financiación.
+5. Presentar hasta **5** opciones escalonadas por cobertura (el salto de 10 % se achica hasta 2,5 % si el rango es angosto); marcar la **recomendada** (mejor ROI).
+6. Cada opción tiene un tilde «En el PPT»: las tildadas forman la tabla de opciones de la presentación (la elegida va siempre). El usuario puede **elegir otra manualmente** o editar una opción. La opción elegida alimenta las diapositivas de "los números", ROI y financiación.
 
 ---
 
@@ -393,6 +397,9 @@ Se rellena la plantilla preservando el diseño. Mapeo:
 
 Imágenes no generables (logo, foto planta, foto montaje): carga opcional; si faltan, queda el marcador.
 
+**Selector de páginas**: en el panel se puede activar/desactivar cada una de las 16 diapositivas. Las condicionales (7, 10, 11) se omiten solas si no corresponden aunque estén activadas.
+**Texto CFI**: el bloque «CFI» de la diapositiva 10 (condiciones de la línea) se completa con un texto editable (una línea por renglón), precargado con el de las presentaciones de ejemplo; vacío = sin bloque.
+
 ---
 
 ## 11. Datos persistidos
@@ -449,10 +456,13 @@ No bloquean el desarrollo. **Hasta que haya respuesta, se implementa el comporta
 | A3 | Ahorro por baterías: `PERFIL DE CONSUMO!X20` divide por `V30` (vacía) y `T26` suma `V24` (vacía) → nunca se suma | Ahorro por baterías = 0 | Definir fórmula (energía almacenada × precio, pico evitado, cortes) |
 | A4 | Potencia contratada (L7) cuando la factura trae pico y fuera de pico distintas | Precargar la **mayor** de las dos, mostrando ambas en la revisión; editable | Regla que defina el equipo (pico / fuera de pico / mayor) |
 | A5 | `Hoja1!R9` (Pot Contr kW, bloque CAMMESA) no se usa en fórmulas | Campo opcional, se guarda y se exporta al Excel, sin efecto en cálculos | Eliminarlo o incorporarlo (posiblemente GUME) |
-| A6 | **[PENDIENTE DE DECISIÓN]** Costo distribuidora $/kWh sugerido (§5.4). El "importe básico" incluye cargos fijos y de capacidad contratada, que la solar no reduce. Ej. factura EPE 07/2026: importe básico ÷ kWh = **434 $/kWh**; solo energía activa ÷ kWh = **124 $/kWh** (≈ 3,5× menos ahorro) | Se precarga importe básico ÷ kWh (como dice §5.4) y en la revisión se muestran ambos valores; editable | Precargar solo energía activa ÷ kWh (`importe_energia_activa`, ya se extrae). Cambio en `extraccion/derivados.py → sugerir()` y en `aplicarSugerencias` del frontend |
+| A6 | **[RESUELTO: se usa el precio en resto, ver §5.4]** Costo distribuidora $/kWh sugerido (§5.4). El "importe básico" incluye cargos fijos y de capacidad contratada, que la solar no reduce. Ej. factura EPE 07/2026: importe básico ÷ kWh = **434 $/kWh**; solo energía activa ÷ kWh = **124 $/kWh** (≈ 3,5× menos ahorro) | Se precarga importe básico ÷ kWh (como dice §5.4) y en la revisión se muestran ambos valores; editable | Precargar solo energía activa ÷ kWh (`importe_energia_activa`, ya se extrae). Cambio en `extraccion/derivados.py → sugerir()` y en `aplicarSugerencias` del frontend |
+
+| A7 | **[PENDIENTE DE ACLARACIÓN]** «Sumar lo que se inyecta como parte del ahorro». El ahorro ya suma inyectada × retribución, pero solo con inhibición = NO y retribución > 0. Falta saber qué se espera ver distinto | Sin cambios | Valorizar la inyección aun con inhibición, precargar la retribución, o mostrar el desglose |
 
 ### 14.3 Resueltos
 
 | Tema | Resolución |
 |---|---|
 | Baterías reducen inyección con ON GRID / baterías = NO | §6.2 y §6.10 #4 |
+| A6 · costo distribuidora | Se usa el precio del kWh en resto, no el monómico (§5.4) |

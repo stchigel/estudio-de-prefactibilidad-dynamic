@@ -29,11 +29,41 @@ PLANTILLA = Path(__file__).parent / "plantillas" / "prefactibilidad.pptx"
 NS_C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 MARCA = re.compile(r"\{\{(\w+)\}\}")
 CONDICION = re.compile(r"^\[\[si:(\w+)\]\]")
-ANIOS_CURVA_ROI = 15  # el gráfico de la plantilla tiene 15 barras
 ANIOS_VIDA_UTIL = 25
 RESALTADO_RECOMENDADA = RGBColor(0xFD, 0xE4, 0xE4)  # rojo muy claro, acorde a la marca
 # Párrafos condicionales que se vacían en lugar de quitarse, para no desalinear íconos.
 VACIAR_EN_LUGAR_DE_QUITAR = {"capacitores"}
+
+
+@dataclass(frozen=True)
+class Diapositiva:
+    numero: int  # posición en la plantilla (desde 1)
+    titulo: str
+    condicion: str | None = None  # clave de _condiciones: sin ella la diapositiva se omite sola
+    nota: str = ""
+
+
+# Selector de páginas: se puede desactivar cualquiera. Las condicionales, además, se omiten
+# si no corresponden aunque estén activadas.
+DIAPOSITIVAS = (
+    Diapositiva(1, "Portada"),
+    Diapositiva(2, "El objetivo"),
+    Diapositiva(3, "La oportunidad detectada"),
+    Diapositiva(4, "La solución"),
+    Diapositiva(5, "Arquitectura del sistema"),
+    Diapositiva(6, "Previsibilidad"),
+    Diapositiva(7, "Opciones propuestas", "opciones", "Solo si hay más de una opción"),
+    Diapositiva(8, "Los números del proyecto"),
+    Diapositiva(9, "Retorno de la inversión"),
+    Diapositiva(10, "Financiamiento propio", "financiacion", "Solo si se financia un porcentaje"),
+    Diapositiva(11, "Financiamiento bancario", "bancaria", "Solo si se completa el texto bancario"),
+    Diapositiva(12, "Beneficios fiscales"),
+    Diapositiva(13, "Impacto ambiental"),
+    Diapositiva(14, "Posicionamiento"),
+    Diapositiva(15, "Track record"),
+    Diapositiva(16, "Siguientes pasos"),
+)
+DIAPOSITIVA_OPCIONES = 7
 
 
 @dataclass
@@ -51,6 +81,8 @@ class DatosPpt:
     opciones: list[OpcionPpt] = field(default_factory=list)  # tabla de la diapositiva 7
     limitado_por_potencia: bool = False
     texto_bancario: str | None = None  # diapositiva 11 (opcional)
+    texto_cfi: str | None = None  # bloque CFI de la diapositiva 10 (vacío = sin bloque)
+    diapositivas_excluidas: frozenset[int] = frozenset()  # números de DIAPOSITIVAS desactivadas
     imagenes: dict[str, bytes] = field(default_factory=dict)  # logo, planta, montaje
 
 
@@ -73,6 +105,10 @@ def compacto(v: float | None) -> str:
 
 def porcentaje(v: float | None, decimales: int = 0) -> str:
     return "—" if v is None else numero(v * 100, decimales)
+
+
+def anios(n: int) -> str:
+    return f"{n} año{'s' if n != 1 else ''}"
 
 
 HORARIOS = {
@@ -118,9 +154,11 @@ def _valores(d: DatosPpt) -> dict[str, str]:
         superficie = f"{numero(r.superficie_m2)} m² de techo requeridos"
         detalle_superficie = "Estimada para el sistema propuesto"
 
+    amortizacion = max(f.plazo_anios - f.gracia_anios, 0)
+    # El plazo es el total: 5 años con 1 de gracia = 4 años de capital más intereses y 1 de solo intereses.
     gracia = ""
     if f.gracia_anios:
-        gracia = f", con {f.gracia_anios} año{'s' if f.gracia_anios > 1 else ''} de gracia"
+        gracia = f" ({anios(amortizacion)} de capital más intereses y {anios(f.gracia_anios)} de gracia, solo intereses)"
     gastos = f" + {numero(f.gastos_adm * 100, 1).rstrip('0').rstrip(',')}% de gastos" if f.gastos_adm else ""
     tasa = numero(f.tasa * 100, 2).rstrip("0").rstrip(",")
 
@@ -181,10 +219,13 @@ def _valores(d: DatosPpt) -> dict[str, str]:
         ),
         "financiacion_cuotas": f"{f.plazo_anios} años en {'USD' if dolares else 'pesos'}",
         "financiacion_detalle": (
-            f"Anticipo del {porcentaje(1 - f.porcentaje)}% + saldo en {12 * f.plazo_anios} cuotas mensuales{gracia}."
+            f"Anticipo del {porcentaje(1 - f.porcentaje)}% + saldo: "
+            + (f"{anios(f.gracia_anios)} de solo intereses y " if f.gracia_anios else "")
+            + f"{12 * amortizacion} cuotas mensuales."
         ),
         "moneda_texto": "dólares" if dolares else "pesos",
         "texto_bancario": d.texto_bancario or "",
+        "texto_cfi": (d.texto_cfi or "").strip(),
         "tco2_anio": compacto(r.huella.tco2_anio),
         "tco2_25": numero(r.huella.tco2_25_anios),
         "arboles": numero(r.huella.arboles),
@@ -197,6 +238,7 @@ def _condiciones(d: DatosPpt) -> dict[str, bool]:
         "opciones": len(d.opciones) > 1,
         "financiacion": d.entradas.financiacion.porcentaje > 0,
         "bancaria": bool(d.texto_bancario and d.texto_bancario.strip()),
+        "cfi": bool(d.texto_cfi and d.texto_cfi.strip()),
         "capacitores": d.entradas.banco_capacitores,
         "meses_estimados": any(c.origen == OrigenConsumo.ESTIMADO for c in d.entradas.consumos),
     }
@@ -254,9 +296,25 @@ def _completar_textos(slide, valores: dict[str, str], condiciones: dict[str, boo
                 else:
                     parrafo._p.getparent().remove(parrafo._p)
                 continue
-        for r in runs:
+        for i, r in enumerate(runs):
             if "{{" in r.text:
                 r.text = MARCA.sub(lambda x: valores[x.group(1)], r.text)
+                if "\n" in r.text:
+                    _desdoblar_parrafo(parrafo, i)
+
+
+def _desdoblar_parrafo(parrafo, indice_run: int) -> None:
+    """Un valor con saltos de línea ocupa un párrafo por línea, con el formato del original."""
+    lineas = parrafo.runs[indice_run].text.split("\n")
+    parrafo.runs[indice_run].text = lineas[0]
+    ancla = parrafo._p
+    for linea in lineas[1:]:
+        copia = copy.deepcopy(parrafo._p)
+        runs = copia.findall("{http://schemas.openxmlformats.org/drawingml/2006/main}r")
+        for j, run in enumerate(runs):
+            run.find("{http://schemas.openxmlformats.org/drawingml/2006/main}t").text = linea if j == indice_run else ""
+        ancla.addnext(copia)
+        ancla = copia
 
 
 def _poner_texto_celda(celda, texto: str, negrita: bool | None = None) -> None:
@@ -354,7 +412,7 @@ def _grafico_roi(slide, d: DatosPpt) -> None:
     f = _buscar(slide, "GRAFICO:roi")
     if f is None:
         return
-    curva = d.resultado.curva_roi[:ANIOS_CURVA_ROI]
+    curva = d.resultado.curva_roi[: d.resultado.anios_curva_roi]  # dinámico según el ROI de cada caso
     datos = CategoryChartData()
     datos.categories = [str(i) for i in range(1, len(curva) + 1)]
     datos.add_series("Capital", curva)
@@ -420,7 +478,10 @@ def generar_ppt(d: DatosPpt, plantilla: Path = PLANTILLA) -> bytes:
     valores = _valores(d)
     condiciones = _condiciones(d)
 
-    for slide in list(prs.slides):
+    for numero, slide in enumerate(list(prs.slides), start=1):
+        if numero in d.diapositivas_excluidas:
+            _eliminar_diapositiva(prs, slide)
+            continue
         condicion = next((f.name[5:] for f in _formas(slide) if f.name.startswith("COND:")), None)
         if condicion and not condiciones[condicion]:
             _eliminar_diapositiva(prs, slide)

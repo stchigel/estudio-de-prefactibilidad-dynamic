@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from motor import provisorios
+from motor.calculo import kvar_capacitores
 from motor.consumos import LecturaMensual, consolidar
 from motor.modelos import ConsumoMensual, OrigenConsumo
 
@@ -24,8 +25,15 @@ class Sugerencias:
     tarifa: str | None = None
     potencia_contratada_kw: float | None = None
     potencias_contratadas: list[float | None] = field(default_factory=list)  # pico, fuera de pico (A4)
-    costo_distribuidora: float | None = None  # §5.4: importe básico / kWh
+    # §5.4 (A6): precio del kWh en resto, NO el monómico (importe básico / kWh), que incluye
+    # cargos fijos y de potencia que la solar no reduce. Si la factura no trae el precio unitario
+    # se cae a energía activa / kWh; `costo_distribuidora_origen` dice cuál se usó.
+    costo_distribuidora: float | None = None
+    costo_distribuidora_origen: str | None = None  # "resto" | "energia_activa"
     costo_energia_activa: float | None = None  # solo energía activa / kWh (informativo)
+    costo_monomico: float | None = None  # importe básico / kWh (informativo, no se usa)
+    cargo_factor_potencia: bool = False  # la factura cobra por factor de potencia → banco de capacitores
+    kvar_sugeridos: float | None = None  # kVAr para llegar a cos φ 0,95 (Bco Capac)
     tasas_mun_prov: float | None = None
     energia_reactiva_kvarh: float | None = None
     energia_activa_kwh: float | None = None
@@ -86,6 +94,33 @@ def _mas_frecuente(valores: list[str | None]) -> str | None:
     return max(set(presentes), key=presentes.count) if presentes else None
 
 
+def _promedio_ponderado(pares: list[tuple[float | None, float | None]]) -> float | None:
+    """Σ importes / Σ kWh (o Σ precio·kWh / Σ kWh) de los pares con ambos datos."""
+    validos = [(i, k) for i, k in pares if i and k]
+    return sum(i for i, _ in validos) / sum(k for _, k in validos) if validos else None
+
+
+def _costo_distribuidora(facturas: list[FacturaExtraida]) -> tuple[float | None, str | None]:
+    """Precio del kWh en resto; si ninguna factura lo trae, energía activa / kWh."""
+    pares = []
+    for f in facturas:
+        peso = f.kwh_resto.valor or _kwh_facturados(f)
+        if f.precio_kwh_resto.valor and peso:
+            pares.append((f.precio_kwh_resto.valor * peso, peso))
+    if pares:
+        return _promedio_ponderado(pares), "resto"
+    activa = _promedio_ponderado([(f.importe_energia_activa.valor, _kwh_facturados(f)) for f in facturas])
+    return (activa, "energia_activa") if activa else (None, None)
+
+
+def _kvar_sugeridos(s: "Sugerencias") -> float | None:
+    if not s.cargo_factor_potencia or not s.potencia_contratada_kw:
+        return None
+    if not s.energia_activa_kwh or s.energia_reactiva_kvarh is None:
+        return None
+    return round(kvar_capacitores(s.potencia_contratada_kw, s.energia_activa_kwh, s.energia_reactiva_kvarh), 1)
+
+
 def sugerir(facturas: list[FacturaExtraida]) -> Sugerencias:
     s = Sugerencias()
     if not facturas:
@@ -103,13 +138,13 @@ def sugerir(facturas: list[FacturaExtraida]) -> Sugerencias:
     s.energia_reactiva_kvarh = reciente.energia_reactiva_kvarh.valor
     s.energia_activa_kwh = _kwh_facturados(reciente)
 
-    # §5.4: promedio ponderado = Σ importes / Σ kWh de las facturas con ambos datos.
-    # TODO(A6, §14.2): decidir si se precarga importe básico/kWh (actual) o solo energía activa/kWh.
-    for atributo, destino in (("importe_basico_energia", "costo_distribuidora"), ("importe_energia_activa", "costo_energia_activa")):
-        pares = [(getattr(f, atributo).valor, _kwh_facturados(f)) for f in facturas]
-        pares = [(i, k) for i, k in pares if i and k]
-        if pares:
-            setattr(s, destino, sum(i for i, _ in pares) / sum(k for _, k in pares))
+    # §5.4: promedio ponderado por kWh de las facturas que traen el dato.
+    s.costo_distribuidora, s.costo_distribuidora_origen = _costo_distribuidora(facturas)
+    s.costo_energia_activa = _promedio_ponderado([(f.importe_energia_activa.valor, _kwh_facturados(f)) for f in facturas])
+    s.costo_monomico = _promedio_ponderado([(f.importe_basico_energia.valor, _kwh_facturados(f)) for f in facturas])
+
+    s.cargo_factor_potencia = any(f.cargo_factor_potencia for f in facturas)
+    s.kvar_sugeridos = _kvar_sugeridos(s)
 
     todas = [l for f in facturas for l in lecturas(f)]
     s.consumos = consolidar(todas)

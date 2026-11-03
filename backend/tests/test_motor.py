@@ -77,23 +77,54 @@ def test_baterias_hibrido_reducen_inyeccion():
     assert not [a for a in con.alertas if a.nivel == "error"]
 
 
-def test_gracia_cero_y_mayor_que_uno():
+def test_financiacion_sin_gracia():
     e = plecor()
-    sin_gracia = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=4, gracia_anios=0, tasa=0.02, gastos_adm=0.01)))
-    f = sin_gracia.financiacion
-    assert f.pagos[0] == pytest.approx(sin_gracia.inversion.total_usd - f.monto_financiado + f.canon_anual)
+    r = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=4, gracia_anios=0, tasa=0.02, gastos_adm=0.01)))
+    f = r.financiacion
+    assert f.pagos[0] == pytest.approx(r.inversion.total_usd - f.monto_financiado + f.canon_anual)
     assert f.pagos[1:4] == [f.canon_anual] * 3
     assert f.pagos[4:] == [0, 0, 0]
 
-    gracia2 = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=3, gracia_anios=2, tasa=0.02, gastos_adm=0.01)))
-    g = gracia2.financiacion
-    assert g.pagos[1] == pytest.approx(g.monto_financiado * 0.02)
-    assert g.pagos[2:5] == [g.canon_anual] * 3
+
+def test_plazo_es_el_total_y_la_gracia_paga_solo_intereses():
+    """5 años con 1 de gracia = 1 año de solo intereses + 4 de capital más intereses."""
+    e = plecor()
+    r = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=5, gracia_anios=1, tasa=0.02, gastos_adm=0.01)))
+    f = r.financiacion
+    intereses = f.monto_financiado * 0.03
+    assert f.pagos[0] == pytest.approx(r.inversion.total_usd - f.monto_financiado + intereses)  # anticipo + intereses
+    assert f.canon_anual == pytest.approx(canon_anual(f.monto_financiado, 5, 1, 0.03))
+    assert f.canon_anual > intereses  # las cuotas siguientes incluyen capital
+    assert f.pagos[1:5] == [pytest.approx(f.canon_anual)] * 4
+    assert f.pagos[5:] == [0, 0]
+    # Lo que se devuelve en 4 años de amortización cubre exactamente el capital financiado.
+    r_mensual = 0.03 / 12
+    saldo = f.monto_financiado
+    for _ in range(4 * 12):
+        saldo = saldo * (1 + r_mensual) - f.canon_anual / 12
+    assert saldo == pytest.approx(0, abs=1e-6)
+
+
+def test_varios_anios_de_gracia():
+    e = plecor()
+    r = calcular(replace(e, financiacion=Financiacion(0.8, plazo_anios=5, gracia_anios=2, tasa=0.02, gastos_adm=0.01)))
+    g = r.financiacion
+    assert g.pagos[1] == pytest.approx(g.monto_financiado * 0.03)  # 2º año de gracia: solo intereses
+    assert g.pagos[2:5] == [pytest.approx(g.canon_anual)] * 3
     assert g.pagos[5:] == [0, 0]
+
+
+def test_gracia_igual_o_mayor_al_plazo_es_error():
+    e = plecor()
+    for plazo, gracia in ((2, 2), (1, 3)):
+        mala = replace(e, financiacion=Financiacion(0.8, plazo_anios=plazo, gracia_anios=gracia, tasa=0.02))
+        assert any(a.codigo == "gracia_financiacion" for a in calcular(mala).alertas)
 
 
 def test_canon_sin_interes_y_sin_plazo():
     assert canon_anual(12000, 2, 0, 0.0) == pytest.approx(6000)
+    assert canon_anual(12000, 3, 1, 0.0) == pytest.approx(6000)  # plazo total 3 con 1 de gracia = 2 de capital
+    assert canon_anual(12000, 2, 2, 0.05) == 0
     assert canon_anual(12000, 0, 0, 0.05) == 0
     assert canon_anual(0, 3, 0, 0.05) == 0
 

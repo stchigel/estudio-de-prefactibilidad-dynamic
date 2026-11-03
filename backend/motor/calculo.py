@@ -5,6 +5,7 @@ Las referencias entre corchetes indican la celda equivalente del Excel.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 from . import provisorios
@@ -29,6 +30,10 @@ from .validaciones import alertas_resultado, validar
 
 ANIOS_FLUJO = 25
 ANIOS_FINANCIACION = 7
+# El gráfico del repago muestra unos años más allá del ROI (con un mínimo) para que se vea el cruce por cero.
+ANIOS_CURVA_ROI_MIN = 8
+ANIOS_CURVA_ROI_MARGEN = 5
+ANIOS_CURVA_ROI_SIN_REPAGO = 15
 DISTANCIA_CABLE_INCLUIDA_M = 5
 # Años en los que la planilla puede ubicar el fee de salida (VAN TIR!B6:B11 y B35:B40).
 ANIOS_FEE_SALIDA = range(5, 11)
@@ -62,6 +67,7 @@ def calcular(
         inversion=inversion,
         roi_anios=roi,
         curva_roi=curva_roi,
+        anios_curva_roi=anios_curva_roi(roi),
         van_tir=_van_tir(e, par, ahorro_usd, inversion.total_usd),
         ppa=_ppa(e, par, energia, inversion.total_usd),
         financiacion=_financiacion(e, inversion.total_usd, ahorro_usd),
@@ -74,6 +80,13 @@ def calcular(
     )
     resultado.alertas = validar(e, cat, par) + alertas_resultado(e, resultado)
     return resultado
+
+
+def anios_curva_roi(roi: float | None) -> int:
+    """Años a mostrar en el gráfico de repago: dinámico según el ROI de cada caso."""
+    if roi is None:
+        return ANIOS_CURVA_ROI_SIN_REPAGO
+    return min(ANIOS_FLUJO, max(ANIOS_CURVA_ROI_MIN, math.ceil(roi) + ANIOS_CURVA_ROI_MARGEN))
 
 
 # ------------------------------------------------------------ generación y BAT
@@ -304,30 +317,37 @@ def _ppa(e: Entradas, par: Parametros, energia: Energia, inversion: float) -> Re
 
 
 def canon_anual(financiado: float, plazo: int, gracia: int, interes: float) -> float:
-    """[Financiación!L5] Sistema francés mensual con capitalización del período de gracia."""
-    if financiado == 0 or plazo <= 0:
+    """Cuota anual de la etapa de amortización: sistema francés mensual a `plazo − gracia` años.
+
+    `plazo` es el total de la financiación (gracia incluida): 5 años con 1 de gracia
+    son 1 año de solo intereses y 4 de capital más intereses.
+    """
+    anios = plazo - gracia
+    if financiado == 0 or anios <= 0:
         return 0.0
-    cuotas = 12 * plazo
-    capital = financiado * (1 + gracia * interes)
+    cuotas = 12 * anios
     r = interes / 12
     if r == 0:
-        return 12 * capital / cuotas
-    return 12 * capital * r / (1 - (1 + r) ** -cuotas)
+        return 12 * financiado / cuotas
+    return 12 * financiado * r / (1 - (1 + r) ** -cuotas)
 
 
 def _financiacion(e: Entradas, inversion: float, ahorro_usd: float) -> ResultadoFinanciacion:
-    """[Financiación!C12:I13]"""
+    """Pagos de los primeros años. Los años de gracia pagan solo intereses sobre el
+    monto financiado (no se capitalizan); después, cuotas de capital más intereses.
+    El año 1 incluye además el anticipo (la parte no financiada)."""
     f = e.financiacion
     financiado = inversion * f.porcentaje
-    canon = canon_anual(financiado, f.plazo_anios, f.gracia_anios, f.tasa + f.gastos_adm)
+    interes = f.tasa + f.gastos_adm
+    canon = canon_anual(financiado, f.plazo_anios, f.gracia_anios, interes)
     propio = inversion - financiado
-    g, n = f.gracia_anios, f.plazo_anios
 
-    pagos = [propio + financiado * f.tasa if g > 0 else propio + canon]
-    pagos.append(financiado * f.tasa if g > 1 else (0.0 if g + n < 2 else canon))
-    for k in range(3, ANIOS_FINANCIACION + 1):
-        pagos.append(0.0 if g > k - 1 else (0.0 if g + n < k else canon))
+    def pago(anio: int) -> float:
+        if anio <= f.gracia_anios:
+            return financiado * interes
+        return canon if anio <= f.plazo_anios else 0.0
 
+    pagos = [propio + pago(1)] + [pago(k) for k in range(2, ANIOS_FINANCIACION + 1)]
     return ResultadoFinanciacion(
         monto_financiado=financiado,
         canon_anual=canon,
@@ -349,6 +369,19 @@ def _huella(generacion_kwh: float, par: Parametros) -> Huella:
         arboles=mwh * par.huella["arboles_por_mwh"],
         autos=mwh * par.huella["autos_por_mwh"],
     )
+
+
+COS_PHI_OBJETIVO = 0.95
+
+
+def kvar_capacitores(
+    potencia_kw: float, activa_kwh: float, reactiva_kvarh: float, cos_phi_objetivo: float = COS_PHI_OBJETIVO
+) -> float:
+    """[Bco Capac!C18] Qc = P · (tan φ − tan φ_obj), con tan φ = E_reactiva / E_activa."""
+    if potencia_kw <= 0 or activa_kwh <= 0 or reactiva_kvarh < 0:
+        return 0.0
+    tan_objetivo = math.tan(math.acos(cos_phi_objetivo))
+    return max(0.0, potencia_kw * (reactiva_kvarh / activa_kwh - tan_objetivo))
 
 
 def _capacidad_bateria_recomendada(e: Entradas, mensual: list[Mensual]) -> float:

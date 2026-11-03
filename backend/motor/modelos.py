@@ -116,8 +116,8 @@ class Financiacion:
     porcentaje: float = 0.0
     tipo: TipoFinanciacion = TipoFinanciacion.PRESTAMO
     moneda: Moneda = Moneda.DOLARES
-    plazo_anios: int = 0
-    gracia_anios: int = 0
+    plazo_anios: int = 0  # total, gracia incluida (5 con 1 de gracia = 4 de amortización)
+    gracia_anios: int = 0  # años de solo intereses
     tasa: float = 0.0
     gastos_adm: float = 0.0
 
@@ -321,3 +321,4 @@ class Resultado:
     alertas: list[Alerta]
     version_catalogo: str
     version_parametros: str
+    anios_curva_roi: int = 15  # años del gráfico de repago (dinámico según el ROI)

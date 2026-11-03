@@ -72,7 +72,11 @@ export function GraficoMensual({ r }: { r: Resultado }) {
 }
 
 export function GraficoRoi({ r }: { r: Resultado }) {
-  const datos = r.curva_roi.map((capital, i) => ({ anio: i + 1, capital }));
+  // El eje llega unos años más allá del repago de cada caso, no a un 25 fijo.
+  const anios = r.anios_curva_roi;
+  const datos = r.curva_roi.slice(0, anios).map((capital, i) => ({ anio: i + 1, capital }));
+  const paso = anios <= 10 ? 1 : anios <= 16 ? 2 : 5;
+  const marcas = Array.from({ length: Math.floor((anios - 1) / paso) + 1 }, (_, i) => 1 + i * paso);
   return (
     <Marco
       titulo="Retorno de la inversión"
@@ -81,7 +85,7 @@ export function GraficoRoi({ r }: { r: Resultado }) {
       <ResponsiveContainer>
         <LineChart data={datos}>
           {GRILLA}
-          <XAxis dataKey="anio" type="number" domain={[1, 25]} ticks={[1, 5, 10, 15, 20, 25]} {...EJE} />
+          <XAxis dataKey="anio" type="number" domain={[1, anios]} ticks={marcas} {...EJE} />
           <YAxis {...EJE} axisLine={false} tickFormatter={miles} width={56} />
           <Tooltip
             {...TOOLTIP}
@@ -90,7 +94,7 @@ export function GraficoRoi({ r }: { r: Resultado }) {
             formatter={(v) => [fmt.usd(Number(v)), "Capital"]}
           />
           <ReferenceLine y={0} stroke="var(--tinta-2)" />
-          {r.roi_anios != null && r.roi_anios <= 25 && (
+          {r.roi_anios != null && r.roi_anios <= anios && (
             <ReferenceLine
               x={r.roi_anios}
               stroke="var(--tenue)"

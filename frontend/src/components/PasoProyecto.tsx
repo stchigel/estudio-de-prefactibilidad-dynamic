@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
-import type { Alerta, Entradas, OpcionesFormulario } from "@/lib/tipos";
+import type { Alerta, Entradas, OpcionesFormulario, Sugerencias } from "@/lib/tipos";
 import { Aviso, Boton, Campo, Grilla, Numero, Opciones, Seccion, SiNo, Texto } from "./ui";
 
 type Actualizar = (cambios: Partial<Entradas>) => void;
@@ -10,12 +10,14 @@ type Actualizar = (cambios: Partial<Entradas>) => void;
 export function PasoProyecto({
   e,
   opciones,
+  sugerencias,
   alCambiar,
   alContinuar,
   alVolver,
 }: {
   e: Entradas;
   opciones: OpcionesFormulario;
+  sugerencias: Sugerencias | null;
   alCambiar: Actualizar;
   alContinuar: () => void;
   alVolver: () => void;
@@ -124,7 +126,16 @@ export function PasoProyecto({
           <Campo etiqueta="Tasas CAMMESA">
             <Numero valor={e.tasa_cammesa} porcentaje alCambiar={(v) => alCambiar({ tasa_cammesa: v ?? 0 })} />
           </Campo>
-          <Campo etiqueta="Costo distribuidora" ayuda="Sugerido de la factura">
+          <Campo
+            etiqueta="Costo distribuidora"
+            ayuda={
+              sugerencias?.costo_distribuidora_origen === "resto"
+                ? "Precio del kWh en resto de la factura (no el monómico)"
+                : sugerencias?.costo_distribuidora_origen === "energia_activa"
+                  ? "Energía activa / kWh: la factura no trae el precio en resto. Revisar"
+                  : "Precio del kWh en resto (no el monómico)"
+            }
+          >
             <Numero valor={e.costo_distribuidora} sufijo="$/kWh" alCambiar={(v) => alCambiar({ costo_distribuidora: v ?? 0 })} />
           </Campo>
           <Campo etiqueta="Tasas municipales / provinciales">
@@ -184,6 +195,15 @@ export function PasoProyecto({
         </Grilla>
         {e.banco_capacitores && (
           <div className="mt-4 border-t border-borde pt-4">
+            {sugerencias?.cargo_factor_potencia && (
+              <div className="mb-4">
+                <Aviso nivel="info">
+                  La factura cobra cargo por factor de potencia: se recomienda banco de capacitores
+                  {sugerencias.kvar_sugeridos != null && ` (${sugerencias.kvar_sugeridos} kVAr para llegar a cos φ 0,95)`}. Completar
+                  inversión y ahorro.
+                </Aviso>
+              </div>
+            )}
             <Grilla>
               <Campo etiqueta="Capacitores">
                 <Numero valor={e.capacitores.kvar} sufijo="kVAr" alCambiar={(v) => alCambiar({ capacitores: { ...e.capacitores, kvar: v ?? 0 } })} />
@@ -289,7 +309,15 @@ export function PasoProyecto({
               <Campo etiqueta="Moneda">
                 <Opciones valor={e.financiacion.moneda} opciones={opciones.monedas} alCambiar={(v) => alCambiar({ financiacion: { ...e.financiacion, moneda: v } })} />
               </Campo>
-              <Campo etiqueta="Plazo" error={error("financiacion.plazo_anios")}>
+              <Campo
+                etiqueta="Plazo total"
+                error={error("financiacion.plazo_anios")}
+                ayuda={
+                  e.financiacion.gracia_anios > 0 && e.financiacion.plazo_anios > e.financiacion.gracia_anios
+                    ? `${e.financiacion.plazo_anios - e.financiacion.gracia_anios} años de capital más intereses y ${e.financiacion.gracia_anios} de gracia (solo intereses)`
+                    : "Incluye los años de gracia"
+                }
+              >
                 <Numero
                   valor={e.financiacion.plazo_anios}
                   sufijo="años"

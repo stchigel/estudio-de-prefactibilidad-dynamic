@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import { fmt } from "@/lib/estado";
-import type { Entradas, Kit, OpcionesFormulario, ResultadoBusqueda } from "@/lib/tipos";
+import type { Entradas, Kit, KitsOpcion, OpcionesFormulario, ResultadoBusqueda } from "@/lib/tipos";
 import { Aviso, Boton, Campo, Grilla, Insignia, Numero, Opciones, Seccion, SiNo } from "./ui";
 
 export function describirKits(k1: Kit, k2: Kit | null) {
@@ -27,12 +27,15 @@ export function PasoOpciones({
 }: {
   e: Entradas;
   opciones: OpcionesFormulario;
-  alElegir: (kit1: Kit, kit2: Kit | null) => void;
+  /** `opcionesPpt`: las opciones tildadas para la tabla del PowerPoint (null = todas). */
+  alElegir: (kit1: Kit, kit2: Kit | null, opcionesPpt: KitsOpcion[] | null) => void;
   alVolver: () => void;
 }) {
   const [busqueda, setBusqueda] = useState<ResultadoBusqueda | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elegida, setElegida] = useState(0);
+  // Opciones que van a la tabla del PowerPoint (por posición); la elegida siempre va.
+  const [destildadas, setDestildadas] = useState<Set<number>>(new Set());
   const [manual, setManual] = useState(false);
   const [kit1, setKit1] = useState<Kit>(e.kit1);
   const [kit2, setKit2] = useState<Kit | null>(e.kit2);
@@ -55,6 +58,17 @@ export function PasoOpciones({
   }, []);
 
   const kwps = opciones.kits.map((k) => k.kwp);
+  const enPpt = (i: number) => i === elegida || !destildadas.has(i);
+  const opcionesPpt = (): KitsOpcion[] | null => {
+    if (!busqueda || destildadas.size === 0) return null;
+    return busqueda.opciones.flatMap((o, i) => (enPpt(i) ? [{ kit1: o.kit1, kit2: o.kit2 }] : []));
+  };
+  const alternar = (i: number) =>
+    setDestildadas((previas) => {
+      const nuevas = new Set(previas);
+      if (!nuevas.delete(i)) nuevas.add(i);
+      return nuevas;
+    });
 
   return (
     <div className="space-y-6">
@@ -70,7 +84,8 @@ export function PasoOpciones({
               <table className="w-full text-sm tabular-nums">
                 <thead>
                   <tr className="border-b border-borde text-left text-xs text-tenue">
-                    <th className="py-2 pr-2" />
+                    <th className="py-2 pr-2 font-medium">Elegir</th>
+                    <th className="px-2 font-medium">En el PPT</th>
                     <th className="px-2 font-medium">Kits</th>
                     <th className="px-2 text-right font-medium">Potencia</th>
                     <th className="px-2 text-right font-medium">Cobertura</th>
@@ -93,6 +108,16 @@ export function PasoOpciones({
                       >
                         <td className="py-2 pr-2">
                           <input type="radio" checked={i === elegida} onChange={() => setElegida(i)} aria-label={`Opción ${i + 1}`} />
+                        </td>
+                        <td className="px-2" onClick={(ev) => ev.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={enPpt(i)}
+                            disabled={i === elegida}
+                            onChange={() => alternar(i)}
+                            aria-label={`Incluir la opción ${i + 1} en la tabla del PowerPoint`}
+                            title={i === elegida ? "La opción elegida siempre se incluye" : undefined}
+                          />
                         </td>
                         <td className="px-2">
                           <span className="flex flex-wrap items-center gap-2">
@@ -119,6 +144,7 @@ export function PasoOpciones({
                 La recomendada es la de mejor ROI; ante diferencias menores a 0,2 años se prefiere la de mayor cobertura. Se evaluaron{" "}
                 {fmt.entero(busqueda.evaluadas)} combinaciones, {fmt.entero(busqueda.validas)} válidas.
               </p>
+              <p>Las opciones tildadas en «En el PPT» forman la tabla de opciones de la presentación.</p>
               {Object.entries(busqueda.descartes).map(([motivo, n]) => (
                 <p key={motivo}>
                   {fmt.entero(n)} descartadas porque {MOTIVOS[motivo] ?? motivo}.
@@ -172,7 +198,7 @@ export function PasoOpciones({
               )}
             </Grilla>
             <div className="flex justify-end">
-              <Boton variante="secundario" onClick={() => alElegir(kit1, kit2)} deshabilitado={kit1.cantidad < 1}>
+              <Boton variante="secundario" onClick={() => alElegir(kit1, kit2, opcionesPpt())} deshabilitado={kit1.cantidad < 1}>
                 Calcular con estos kits
               </Boton>
             </div>
@@ -189,7 +215,7 @@ export function PasoOpciones({
         <Boton
           onClick={() => {
             const o = busqueda?.opciones[elegida];
-            if (o) alElegir(o.kit1, o.kit2);
+            if (o) alElegir(o.kit1, o.kit2, opcionesPpt());
           }}
           deshabilitado={!busqueda?.opciones.length}
         >

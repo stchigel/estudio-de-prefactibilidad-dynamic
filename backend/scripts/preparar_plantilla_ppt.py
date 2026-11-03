@@ -199,8 +199,13 @@ def preparar(origen: Path, destino: Path) -> None:
     parrafo_completo(forma(s[9], 16), "Anticipo + saldo", "{{financiacion_detalle}}")
     reemplazar(forma(s[9], 20), "en dólares", "en {{moneda_texto}}")
     forma(s[9], 3).name = "GRAFICO:financiacion"
-    eliminar(forma(s[9], 36))  # bloque CFI: va en la diapositiva bancaria
-    eliminar(forma(s[9], 37))
+    # Bloque CFI ("CFI" + condiciones de la línea): se completa desde la app y se oculta si no hay texto.
+    forma(s[9], 36).name = "COND_FORMA:cfi"
+    t = forma(s[9], 37)
+    t.name = "COND_FORMA:cfi"
+    parrafo_completo(t, "Plazos hasta", "{{texto_cfi}}")
+    for parrafo in t.text_frame.paragraphs[1:]:  # el resto de las líneas las genera el exporte
+        parrafo._p.getparent().remove(parrafo._p)
 
     # 11 · Financiamiento bancario (opcional)
     t = forma(s[10], 2)

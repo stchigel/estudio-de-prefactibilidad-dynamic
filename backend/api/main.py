@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 from starlette.background import BackgroundTask
 
 from exportes.excel import exportar_excel
-from exportes.powerpoint import DatosPpt, OpcionPpt, generar_ppt
+from exportes.powerpoint import DIAPOSITIVA_OPCIONES, DIAPOSITIVAS, DatosPpt, OpcionPpt, generar_ppt
 from extraccion.derivados import sugerir
 from extraccion.esquema import FacturaExtraida
 from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_factura
@@ -94,6 +94,7 @@ def opciones() -> dict[str, Any]:
         "tipos_financiacion": [t.value for t in TipoFinanciacion],
         "monedas": [m.value for m in Moneda],
         "origenes_superficie": [o.value for o in OrigenSuperficie],
+        "diapositivas": [a_dict(d) for d in DIAPOSITIVAS],
         "kits": [a_dict(k) for k in cat.kits],
         "baterias": [a_dict(b) for b in cat.baterias],
     }
@@ -138,10 +139,19 @@ def buscar(entradas: Entradas) -> dict[str, Any]:
     return a_dict(buscar_opciones(entradas))
 
 
+class KitsOpcion(BaseModel):
+    kit1: Kit
+    kit2: Kit | None = None
+
+
 class PedidoPpt(BaseModel):
     entradas: Entradas
     incluir_opciones: bool = True
+    # Opciones tildadas para la tabla; None = todas las que encuentre la búsqueda. La elegida va siempre.
+    opciones_incluidas: list[KitsOpcion] | None = None
+    diapositivas_excluidas: list[int] = []  # selector de páginas (números de DIAPOSITIVAS)
     texto_bancario: str | None = None
+    texto_cfi: str | None = None
 
 
 def _mismos_kits(a: Kit, b: Kit | None, c: Kit, d: Kit | None) -> bool:
@@ -166,14 +176,23 @@ async def exportar_ppt(
     if bloqueantes:
         raise HTTPException(422, [a_dict(a) for a in bloqueantes])
 
+    excluidas = frozenset(pedido.diapositivas_excluidas)
+    if not excluidas <= {d.numero for d in DIAPOSITIVAS}:
+        raise HTTPException(422, "diapositivas_excluidas: número de diapositiva inexistente")
+
     resultado = calcular(e)
     opciones: list[OpcionPpt] = []
     limitado = False
-    if pedido.incluir_opciones:
+    if pedido.incluir_opciones and DIAPOSITIVA_OPCIONES not in excluidas:
         busqueda = await run_in_threadpool(buscar_opciones, e)
         limitado = busqueda.limitado_por_potencia
+        tildadas = pedido.opciones_incluidas
         for o in busqueda.opciones:
             elegida = _mismos_kits(o.kit1, o.kit2, e.kit1, e.kit2)
+            if not elegida and tildadas is not None and not any(
+                _mismos_kits(o.kit1, o.kit2, t.kit1, t.kit2) for t in tildadas
+            ):
+                continue
             opciones.append(OpcionPpt(o.kit1, o.kit2, o.recomendada, resultado if elegida else o.resultado))
         if not any(o.resultado is resultado for o in opciones):
             opciones.append(OpcionPpt(e.kit1, e.kit2, False, resultado))
@@ -188,7 +207,9 @@ async def exportar_ppt(
     try:
         contenido = await run_in_threadpool(
             generar_ppt,
-            DatosPpt(e, resultado, opciones, limitado, pedido.texto_bancario, imagenes),
+            DatosPpt(
+                e, resultado, opciones, limitado, pedido.texto_bancario, pedido.texto_cfi, excluidas, imagenes
+            ),
         )
     except UnidentifiedImageError as exc:
         raise HTTPException(415, "Alguna de las imágenes no es un JPG o PNG válido") from exc

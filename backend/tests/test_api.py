@@ -106,3 +106,40 @@ def test_exportar_ppt_imagen_invalida():
     datos = json.dumps({"entradas": PLECOR["entradas"], "incluir_opciones": False})
     r = cliente.post("/api/exportes/ppt", data={"datos": datos}, files={"logo": ("logo.png", b"no es imagen", "image/png")})
     assert r.status_code == 415
+
+
+def test_opciones_lista_las_diapositivas():
+    d = cliente.get("/api/opciones").json()["diapositivas"]
+    assert [x["numero"] for x in d] == list(range(1, 17))
+    assert next(x for x in d if x["numero"] == 7)["condicion"] == "opciones"
+
+
+def test_exportar_ppt_con_selector_de_paginas():
+    from pptx import Presentation
+
+    base = {"entradas": PLECOR["entradas"], "incluir_opciones": True}
+    r = cliente.post("/api/exportes/ppt", data={"datos": json.dumps(base)})
+    todas = len(Presentation(io.BytesIO(r.content)).slides)
+    r = cliente.post("/api/exportes/ppt", data={"datos": json.dumps({**base, "diapositivas_excluidas": [6, 12]})})
+    assert r.status_code == 200 and len(Presentation(io.BytesIO(r.content)).slides) == todas - 2
+    r = cliente.post("/api/exportes/ppt", data={"datos": json.dumps({**base, "diapositivas_excluidas": [99]})})
+    assert r.status_code == 422
+
+
+def test_exportar_ppt_solo_con_las_opciones_tildadas():
+    from pptx import Presentation
+
+    busqueda = cliente.post("/api/opciones/buscar", json=PLECOR["entradas"]).json()["opciones"]
+    assert len(busqueda) >= 4
+    tildada = busqueda[0]
+    pedido = {
+        "entradas": PLECOR["entradas"],
+        "opciones_incluidas": [{"kit1": tildada["kit1"], "kit2": tildada["kit2"]}],
+    }
+    r = cliente.post("/api/exportes/ppt", data={"datos": json.dumps(pedido)})
+    assert r.status_code == 200, r.text
+    prs = Presentation(io.BytesIO(r.content))
+    tabla = next(
+        f.table for s in prs.slides for f in s.shapes if getattr(f, "has_table", False) and f.has_table and f.name == "TABLA:opciones"
+    )
+    assert len(list(tabla.rows)) == 1 + 2  # la tildada + la elegida (PLECOR de las entradas)
