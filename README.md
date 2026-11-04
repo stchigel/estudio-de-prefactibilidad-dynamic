@@ -12,7 +12,19 @@ Especificación: [docs/especificacion.md](docs/especificacion.md) · pendientes 
 
 - Python 3.12 o superior
 - Node.js 20 o superior (probado con 24 LTS)
-- Opcional: API key de Gemini (pruebas) o de Anthropic (producción) para leer facturas automáticamente
+- Opcional: API key de Gemini (Google) o de Claude (Anthropic) para leer facturas automáticamente
+
+## Primer paso: configurar la API key (Windows)
+
+Doble clic en **`setup-key.bat`**, en la carpeta del repositorio. El script:
+
+1. Crea `backend/.env` a partir de `backend/.env.example` (si ya existe lo conserva y solo actualiza lo que sigue).
+2. Pide elegir el proveedor de IA, **Gemini** o **Claude**, con las flechas arriba/abajo y Enter.
+3. Pide pegar la API key (no se muestra en pantalla) y completa el `.env` con el proveedor y la key.
+
+La key se obtiene en https://aistudio.google.com/apikey (Gemini) o https://console.anthropic.com (Claude).
+Se puede volver a correr cuando haga falta cambiar de proveedor o de key; después hay que reiniciar el sistema.
+Este paso es opcional: sin key la aplicación funciona igual y los consumos se cargan a mano.
 
 ## Iniciar el sistema (Windows)
 
@@ -20,6 +32,7 @@ Doble clic en el script de la carpeta del repositorio:
 
 | Script | Para qué |
 |---|---|
+| `setup-key.bat` | Configura el proveedor de IA y su API key en `backend/.env` (ver "Primer paso") |
 | `iniciar.bat` | Uso normal. Compila el frontend y abre backend y frontend en dos ventanas; al terminar abre el navegador y muestra la dirección para otras PCs (Tailscale) |
 | `iniciar-desarrollo.bat` | Para trabajar en el código: recarga automática al guardar cambios |
 | `detener.bat` | Apaga los dos servidores (también alcanza con cerrar sus ventanas) |
@@ -67,31 +80,28 @@ http://localhost:8000/docs.
 
 ### Lectura automática de facturas
 
-La lectura de facturas con IA se configura en el archivo **`backend/.env`** (no se sube
-al repositorio). Si no existe, copiar `backend/.env.example` como `backend/.env`.
+Se configura en el archivo **`backend/.env`** (no se sube al repositorio). En Windows lo más
+simple es correr `setup-key.bat` (ver "Primer paso"). A mano: copiar `backend/.env.example`
+como `backend/.env` y completar según el proveedor.
 
-**Para pruebas: Gemini (gratis)**
+**Gemini** (key en https://aistudio.google.com/apikey → "Create API key"):
 
-1. Entrar a https://aistudio.google.com/apikey con una cuenta de Google.
-2. "Create API key" → copiar la key.
-3. Pegarla en `backend/.env`:
+```
+EXTRACCION_PROVEEDOR=gemini
+GEMINI_API_KEY=la-key-copiada
+```
 
-   ```
-   EXTRACCION_PROVEEDOR=gemini
-   GEMINI_API_KEY=la-key-copiada
-   ```
-
-4. Reiniciar el backend (terminal 1: Ctrl+C y volver a iniciarlo).
-
-> En el plan gratuito Google usa el contenido enviado para mejorar sus productos.
-> Sirve para probar; para facturas reales de clientes en producción usar Claude.
-
-**Para producción: Claude**
+**Claude** (key en https://console.anthropic.com):
 
 ```
 EXTRACCION_PROVEEDOR=claude
 ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+Después reiniciar el backend (terminal 1: Ctrl+C y volver a iniciarlo).
+
+> En el plan gratuito de Gemini, Google usa el contenido enviado para mejorar sus productos;
+> tenerlo en cuenta si se procesan facturas reales de clientes.
 
 Sin key la aplicación funciona igual: avisa que la lectura no está configurada y los
 consumos se cargan a mano.
