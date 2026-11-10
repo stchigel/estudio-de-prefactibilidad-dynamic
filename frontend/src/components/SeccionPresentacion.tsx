@@ -26,6 +26,29 @@ const TEXTO_CFI_POR_DEFECTO = [
 const claseTexto =
   "w-full rounded-md border border-borde-fuerte bg-superficie px-3 py-2 text-sm leading-5 text-tinta outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-tenue hover:border-eje focus:border-acento focus:ring-3 focus:ring-acento/20";
 
+/** Miniatura genérica de una diapositiva (marcador; no refleja el contenido real). */
+function Miniatura({ numero, apagada }: { numero: number; apagada: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`relative flex aspect-video w-28 shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border border-borde bg-plano p-2 transition-opacity duration-150 ${
+        apagada ? "opacity-50 grayscale" : ""
+      }`}
+    >
+      <span className="h-1.5 w-3/5 rounded-full bg-tinta-2/45" />
+      <span className="flex flex-1 gap-1.5">
+        <span className="flex flex-1 flex-col gap-1 pt-0.5">
+          <span className="h-1 w-full rounded-full bg-eje" />
+          <span className="h-1 w-4/5 rounded-full bg-eje" />
+          <span className="h-1 w-2/3 rounded-full bg-eje" />
+        </span>
+        <span className="w-2/5 rounded-sm bg-acento/25" />
+      </span>
+      <span className="absolute bottom-1 right-1.5 text-[9px] font-medium leading-none text-tenue tabular-nums">{numero}</span>
+    </span>
+  );
+}
+
 export function SeccionPresentacion({
   e,
   diapositivas,
@@ -94,7 +117,12 @@ export function SeccionPresentacion({
       <fieldset className="mt-6 border-t border-borde pt-5">
         <legend className="sr-only">Páginas de la presentación</legend>
         <div className="mb-2 flex w-full items-center justify-between text-[13px] font-medium text-tinta-2">
-          <span aria-hidden>Páginas de la presentación</span>
+          <span aria-hidden>
+            Páginas de la presentación
+            <span className="ml-2 font-normal text-tenue tabular-nums">
+              {diapositivas.length - excluidas.size} de {diapositivas.length}
+            </span>
+          </span>
           <span className="flex gap-3 text-xs font-normal">
             <button type="button" className="rounded font-medium text-acento underline-offset-2 hover:underline" onClick={() => setExcluidas(new Set())}>
               Todas
@@ -108,18 +136,32 @@ export function SeccionPresentacion({
             </button>
           </span>
         </div>
-        <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-          {diapositivas.map((d) => (
-            <li key={d.numero}>
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-superficie-2">
-                <input type="checkbox" className="mt-0.5 shrink-0" checked={!excluidas.has(d.numero)} onChange={() => alternar(d.numero)} />
-                <span className="text-tinta">
-                  <span className="tabular-nums text-tenue">{d.numero}.</span> {d.titulo}
-                  {d.nota && <span className="block text-xs text-tenue">{d.nota}</span>}
-                </span>
-              </label>
-            </li>
-          ))}
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {diapositivas.map((d) => {
+            const incluida = !excluidas.has(d.numero);
+            return (
+              <li key={d.numero}>
+                <label
+                  className={`relative flex h-full cursor-pointer gap-3 rounded-lg border p-2.5 transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-acento ${
+                    incluida ? "border-borde-fuerte bg-superficie hover:border-acento/60" : "border-borde bg-superficie-2/60 hover:border-borde-fuerte"
+                  }`}
+                >
+                  <Miniatura numero={d.numero} apagada={!incluida} />
+                  <span className="flex min-w-0 flex-1 flex-col py-0.5 pr-6">
+                    <span className="text-xs text-tenue tabular-nums">Diapositiva {d.numero}</span>
+                    <span className={`text-sm font-medium leading-5 ${incluida ? "text-tinta" : "text-tenue"}`}>{d.titulo}</span>
+                    {d.nota && <span className="mt-0.5 text-xs leading-4 text-tenue">{d.nota}</span>}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="absolute right-2.5 top-2.5"
+                    checked={incluida}
+                    onChange={() => alternar(d.numero)}
+                  />
+                </label>
+              </li>
+            );
+          })}
         </ul>
       </fieldset>
 

@@ -82,6 +82,9 @@ export function leerNumero(t: string): number {
 export const claseInput =
   "h-9 w-full rounded-md border border-borde-fuerte bg-superficie px-3 text-sm text-tinta tabular-nums outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-tenue hover:border-eje focus:border-acento focus:ring-3 focus:ring-acento/20 disabled:cursor-not-allowed disabled:bg-superficie-2 disabled:text-tenue group-data-invalido:border-critico group-data-invalido:focus:ring-critico/20";
 
+const claseCelda =
+  "block h-10 w-full bg-superficie-2/45 px-3 text-right text-sm text-tinta tabular-nums outline-none transition-colors duration-150 hover:bg-acento-suave/60 focus:bg-superficie focus:shadow-[inset_0_0_0_2px_var(--acento)]";
+
 /** Número editable. `porcentaje` muestra 0,12 como 12. Acepta coma decimal. */
 export function Numero({
   valor,
@@ -92,7 +95,7 @@ export function Numero({
   sufijo,
   deshabilitado,
   vacioEsNulo,
-  compacto,
+  celda,
   etiqueta,
 }: {
   valor: number | null;
@@ -103,8 +106,8 @@ export function Numero({
   sufijo?: string;
   deshabilitado?: boolean;
   vacioEsNulo?: boolean;
-  /** Celda de tabla: más baja y alineada a la derecha para leer columnas de cifras. */
-  compacto?: boolean;
+  /** Celda de planilla: ocupa toda la celda, sin caja propia y alineada a la derecha para leer columnas de cifras. */
+  celda?: boolean;
   /** Nombre accesible cuando el campo no tiene un <label> visible (celdas de tabla). */
   etiqueta?: string;
 }) {
@@ -124,7 +127,7 @@ export function Numero({
   return (
     <div className="relative">
       <input
-        className={`${claseInput} ${compacto ? "h-8 px-2 text-right" : ""} ${conSufijo ? (sufijo && sufijo.length > 3 ? "pr-20" : "pr-10") : ""}`}
+        className={`${celda ? claseCelda : claseInput} ${conSufijo ? (sufijo && sufijo.length > 3 ? "pr-20" : "pr-10") : ""}`}
         inputMode="decimal"
         value={texto}
         disabled={deshabilitado}

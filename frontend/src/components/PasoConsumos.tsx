@@ -46,7 +46,13 @@ function VisorFactura({ archivo }: { archivo: File | undefined }) {
     );
   }
   return archivo.type === "application/pdf" ? (
-    <iframe src={url} title={archivo.name} className="h-[70vh] w-full rounded-lg border border-borde bg-superficie-2" />
+    // Parámetros de apertura del visor: sin el panel de miniaturas y con la página ajustada al ancho
+    // (navpanes/view: Chrome y Edge; pagemode: Firefox).
+    <iframe
+      src={`${url}#navpanes=0&pagemode=none&view=FitH`}
+      title={archivo.name}
+      className="h-[70vh] w-full rounded-lg border border-borde bg-superficie-2"
+    />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt={archivo.name} className="max-h-[70vh] w-full rounded-lg border border-borde bg-superficie-2 object-contain" />
@@ -80,25 +86,33 @@ export function PasoConsumos({
   const tabla = (
     <Seccion titulo="Consumos de los últimos 12 meses (kWh)">
       <div className="-mx-5 -mt-5 overflow-x-auto">
-        <table className="w-full min-w-[680px] text-sm tabular-nums">
+        <table className="w-full min-w-[680px] table-fixed border-collapse text-sm tabular-nums">
+          <colgroup>
+            <col className="w-24" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[13%]" />
+            <col />
+          </colgroup>
           <thead>
             <tr className="border-b border-borde bg-superficie-2 text-xs text-tinta-2">
-              <th scope="col" className="py-2 pl-5 pr-2 text-left font-medium">
+              <th scope="col" className="py-2 pl-5 pr-3 text-left font-medium">
                 Mes
               </th>
-              <th scope="col" className="px-1.5 text-right font-medium">
+              <th scope="col" className="border-l border-borde px-3 text-right font-medium">
                 Valle
               </th>
-              <th scope="col" className="px-1.5 text-right font-medium">
+              <th scope="col" className="border-l border-borde px-3 text-right font-medium">
                 Resto
               </th>
-              <th scope="col" className="px-1.5 text-right font-medium">
+              <th scope="col" className="border-l border-borde px-3 text-right font-medium">
                 Pico
               </th>
-              <th scope="col" className="w-32 px-3 text-right font-medium">
+              <th scope="col" className="border-l border-borde px-3 text-right font-medium">
                 Total
               </th>
-              <th scope="col" className="pl-2 pr-5 text-left font-medium">
+              <th scope="col" className="pl-4 pr-5 text-left font-medium">
                 Origen
               </th>
             </tr>
@@ -107,17 +121,19 @@ export function PasoConsumos({
             {consumos.map((c, i) => {
               const vacio = c.valle + c.resto + c.pico === 0;
               return (
-                <tr key={MESES[i]} className="border-b border-borde last:border-0 hover:bg-superficie-2/60">
-                  <th scope="row" className="w-20 py-1 pl-5 pr-2 text-left text-[13px] font-medium text-tinta-2">
+                <tr key={MESES[i]} className="border-b border-borde">
+                  <th scope="row" className="py-0 pl-5 pr-3 text-left text-[13px] font-medium text-tinta-2">
                     {MESES[i]}
                   </th>
                   {(["valle", "resto", "pico"] as const).map((campo) => (
-                    <td key={campo} className="w-36 px-1.5 py-1">
-                      <Numero compacto etiqueta={`${FRANJAS[campo]} ${MESES[i]}`} valor={c[campo]} alCambiar={(v) => editar(i, campo, v)} />
+                    <td key={campo} className="border-l border-borde p-0">
+                      <Numero celda etiqueta={`${FRANJAS[campo]} ${MESES[i]}`} valor={c[campo]} alCambiar={(v) => editar(i, campo, v)} />
                     </td>
                   ))}
-                  <td className={`px-3 text-right font-medium ${vacio ? "text-tenue" : "text-tinta"}`}>{fmt.entero(c.valle + c.resto + c.pico)}</td>
-                  <td className="pl-2 pr-5">
+                  <td className={`border-l border-borde px-3 text-right font-medium ${vacio ? "text-tenue" : "text-tinta"}`}>
+                    {fmt.entero(c.valle + c.resto + c.pico)}
+                  </td>
+                  <td className="py-1.5 pl-4 pr-5">
                     <span className="flex flex-wrap gap-1">
                       <Insignia tono={TONO_ORIGEN[c.origen]}>{c.origen}</Insignia>
                       {sinFranjas.has(i + 1) && c.origen !== "manual" && <Insignia tono="advertencia">sin franjas</Insignia>}
@@ -128,11 +144,11 @@ export function PasoConsumos({
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-borde-fuerte bg-superficie-2 font-semibold">
+            <tr className="bg-superficie-2 font-semibold">
               <th scope="row" className="py-2.5 pl-5 text-left" colSpan={4}>
                 Total anual
               </th>
-              <td className="px-3 text-right">{fmt.entero(total)}</td>
+              <td className="border-l border-borde px-3 text-right">{fmt.entero(total)}</td>
               <td className="pr-5" />
             </tr>
           </tfoot>
