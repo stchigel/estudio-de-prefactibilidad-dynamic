@@ -21,13 +21,24 @@ export class ErrorApi extends Error {
   }
 }
 
+/** Aviso global de que la sesión se venció o falta: la pantalla principal vuelve a pedir la contraseña. */
+export const EVENTO_SESION_VENCIDA = "sesion-vencida";
+
+function sesionVencida() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENTO_SESION_VENCIDA));
+}
+
+// La cookie de sesión viaja también cuando la API está en otro origen (frontend estático + API aparte).
+const conCredenciales = (init?: RequestInit): RequestInit => ({ ...init, credentials: "include" });
+
 async function pedir<T>(ruta: string, init?: RequestInit): Promise<T> {
   let r: Response;
   try {
-    r = await fetch(`${BASE}${ruta}`, init);
+    r = await fetch(`${BASE}${ruta}`, conCredenciales(init));
   } catch {
-    throw new ErrorApi(0, `No se pudo conectar con el servidor (${BASE}). ¿Está corriendo el backend?`);
+    throw new ErrorApi(0, `No se pudo conectar con el servidor (${BASE || "mismo origen"}). ¿Está corriendo el backend?`);
   }
+  if (r.status === 401 && ruta !== "/api/login") sesionVencida();
   if (!r.ok) {
     const cuerpo = await r.json().catch(() => ({}));
     const detalle = cuerpo.detail;
@@ -57,6 +68,9 @@ const json = (cuerpo: unknown): RequestInit => ({
 });
 
 export const api = {
+  sesion: () => pedir<{ requiere_login: boolean; autenticado: boolean }>("/api/sesion"),
+  login: (password: string) => pedir<{ autenticado: boolean }>("/api/login", json({ password })),
+  logout: () => pedir<{ autenticado: boolean }>("/api/logout", { method: "POST" }),
   opciones: () => pedir<OpcionesFormulario>("/api/opciones"),
   calcular: (e: Entradas) => pedir<Resultado>("/api/calcular", json(e)),
   validar: (e: Entradas) => pedir<Alerta[]>("/api/validar", json(e)),
@@ -69,7 +83,8 @@ export const api = {
     return pedir<RespuestaExtraccion>("/api/facturas/extraer", { method: "POST", body: datos });
   },
   async exportarExcel(e: Entradas): Promise<void> {
-    const r = await fetch(`${BASE}/api/exportes/excel`, json(e));
+    const r = await fetch(`${BASE}/api/exportes/excel`, conCredenciales(json(e)));
+    if (r.status === 401) sesionVencida();
     if (!r.ok) throw new ErrorApi(r.status, "No se pudo generar el Excel");
     await descargar(r, "propuesta.xlsx");
   },
@@ -98,10 +113,11 @@ export const api = {
     for (const [nombre, archivo] of Object.entries(opciones.imagenes)) if (archivo) datos.append(nombre, archivo);
     let r: Response;
     try {
-      r = await fetch(`${BASE}/api/exportes/ppt`, { method: "POST", body: datos });
+      r = await fetch(`${BASE}/api/exportes/ppt`, conCredenciales({ method: "POST", body: datos }));
     } catch {
       throw new ErrorApi(0, "No se pudo conectar con el servidor");
     }
+    if (r.status === 401) sesionVencida();
     if (!r.ok) {
       const cuerpo = await r.json().catch(() => ({}));
       throw new ErrorApi(r.status, typeof cuerpo.detail === "string" ? cuerpo.detail : "No se pudo generar la presentación");

@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { PantallaLogin } from "@/components/PantallaLogin";
 import { PasoConsumos } from "@/components/PasoConsumos";
 import { PasoFacturas } from "@/components/PasoFacturas";
 import { PasoOpciones } from "@/components/PasoOpciones";
 import { PasoProyecto } from "@/components/PasoProyecto";
 import { PasoResultados } from "@/components/PasoResultados";
 import { Aviso, Boton } from "@/components/ui";
-import { api, ErrorApi } from "@/lib/api";
+import { api, ErrorApi, EVENTO_SESION_VENCIDA } from "@/lib/api";
 import {
   aplicarSugerencias,
   borrarBorrador,
@@ -25,10 +26,49 @@ const sinSuscripcion = () => () => {};
 export default function Inicio() {
   // El borrador vive en localStorage: el asistente se monta solo en el navegador.
   const enCliente = useSyncExternalStore(sinSuscripcion, () => true, () => false);
-  return enCliente ? <Asistente /> : null;
+  return enCliente ? <ControlAcceso /> : null;
 }
 
-function Asistente() {
+/** Si la API tiene contraseña (publicada en internet) pide iniciar sesión; si no, entra directo. */
+function ControlAcceso() {
+  const [estado, setEstado] = useState<"comprobando" | "login" | "listo" | "error">("comprobando");
+  const [requiereLogin, setRequiereLogin] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .sesion()
+      .then((s) => {
+        setRequiereLogin(s.requiere_login);
+        setEstado(s.autenticado ? "listo" : "login");
+      })
+      .catch((e: ErrorApi) => {
+        setError(e.message);
+        setEstado("error");
+      });
+    // Sesión vencida a mitad de trabajo: el borrador queda en localStorage y se recupera al volver a entrar.
+    const alVencer = () => setEstado("login");
+    window.addEventListener(EVENTO_SESION_VENCIDA, alVencer);
+    return () => window.removeEventListener(EVENTO_SESION_VENCIDA, alVencer);
+  }, []);
+
+  const salir = () => {
+    api.logout().finally(() => setEstado("login"));
+  };
+
+  if (estado === "comprobando") return null;
+  if (estado === "error") {
+    return (
+      <div className="mx-auto w-full max-w-xl px-4 py-8">
+        <Aviso nivel="error">{error}</Aviso>
+      </div>
+    );
+  }
+  if (estado === "login") return <PantallaLogin alEntrar={() => setEstado("listo")} />;
+  return <Asistente alSalir={requiereLogin ? salir : undefined} />;
+}
+
+function Asistente({ alSalir }: { alSalir?: () => void }) {
   const [borrador] = useState(leerBorrador);
   const [paso, setPaso] = useState<Paso>(borrador?.paso ?? "Facturas");
   const [entradas, setEntradas] = useState<Entradas>(() => ({ ...entradasIniciales(), ...borrador?.entradas }));
@@ -69,9 +109,16 @@ function Asistente() {
           <p className="text-xs font-medium uppercase tracking-wide text-acento">Dynamic Energy</p>
           <h1 className="text-2xl font-semibold text-tinta">Estudio de prefactibilidad solar</h1>
         </div>
-        <Boton variante="fantasma" onClick={nueva}>
-          Nueva propuesta
-        </Boton>
+        <div className="flex items-center gap-2">
+          <Boton variante="fantasma" onClick={nueva}>
+            Nueva propuesta
+          </Boton>
+          {alSalir && (
+            <Boton variante="fantasma" onClick={alSalir}>
+              Salir
+            </Boton>
+          )}
+        </div>
       </header>
 
       <nav aria-label="Pasos" className="mb-8">
