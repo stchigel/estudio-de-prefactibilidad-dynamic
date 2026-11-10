@@ -219,6 +219,10 @@ export function PasoConsumos({
                           {dudoso && <Insignia tono="advertencia">revisar</Insignia>}
                           {campo?.valor == null ? (
                             <span className="text-tenue">—</span>
+                          ) : clave === "periodo_mes" && typeof campo.valor === "number" ? (
+                            `${MESES[campo.valor - 1] ?? campo.valor} (${campo.valor})`
+                          ) : clave === "periodo_anio" ? (
+                            String(campo.valor)
                           ) : typeof campo.valor === "number" ? (
                             fmt.n(campo.valor, 2)
                           ) : (

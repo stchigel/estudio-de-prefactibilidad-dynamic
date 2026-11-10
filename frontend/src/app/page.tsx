@@ -7,7 +7,7 @@ import { PasoFacturas } from "@/components/PasoFacturas";
 import { PasoOpciones } from "@/components/PasoOpciones";
 import { PasoProyecto } from "@/components/PasoProyecto";
 import { PasoResultados } from "@/components/PasoResultados";
-import { Aviso, Boton, Marca, SelectorTema } from "@/components/ui";
+import { Aviso, Boton, Confirmacion, Marca, SelectorTema } from "@/components/ui";
 import { Pasos } from "@/components/Pasos";
 import { FilePlus, LoaderCircle, LogOut } from "lucide-react";
 import { api, ErrorApi, EVENTO_SESION_VENCIDA } from "@/lib/api";
@@ -93,8 +93,9 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
 
   const actualizar = useCallback((c: Partial<Entradas>) => setEntradas((e) => ({ ...e, ...c })), []);
 
-  const nueva = () => {
-    if (!confirm("¿Descartar la propuesta actual y empezar una nueva?")) return;
+  const [confirmandoNueva, setConfirmandoNueva] = useState(false);
+  const nueva = () => setConfirmandoNueva(true);
+  const empezarNueva = () => {
     borrarBorrador();
     setEntradas(entradasNuevoAnalisis);
     setExtraccion(null);
@@ -197,6 +198,18 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
         />
       )}
       </main>
+
+      <Confirmacion
+        abierto={confirmandoNueva}
+        titulo="¿Descartar la propuesta actual y empezar una nueva?"
+        confirmar="Descartar y empezar"
+        peligro
+        alConfirmar={empezarNueva}
+        alCerrar={() => setConfirmandoNueva(false)}
+      >
+        Se borran las facturas, los consumos y los datos del cliente. Los parámetros de mercado (valor del dólar, costos y tasas
+        mayoristas y CAMMESA, Res. 976/281) y los criterios de evaluación se conservan.
+      </Confirmacion>
     </>
   );
 }

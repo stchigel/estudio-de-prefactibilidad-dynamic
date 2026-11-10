@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, CircleAlert, CircleX, Info, LoaderCircle, Monitor, Moon, Sun, SunMedium, TriangleAlert } from "lucide-react";
-import { isValidElement, useState, type ReactNode } from "react";
+import { isValidElement, useEffect, useRef, useState, type ReactNode } from "react";
 import { aplicarTema, leerTema, type Tema } from "@/lib/tema";
 
 export function Seccion({
@@ -234,21 +234,25 @@ export function Boton({
   tipo = "button",
   icono,
   titulo,
+  autoFoco,
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variante?: "primario" | "secundario" | "fantasma";
+  variante?: "primario" | "secundario" | "fantasma" | "peligro";
   deshabilitado?: boolean;
   cargando?: boolean;
   tipo?: "button" | "submit";
   /** Ícono a la izquierda del texto; mientras carga se reemplaza por el indicador. */
   icono?: ReactNode;
   titulo?: string;
+  /** Recibe el foco al abrirse el diálogo que lo contiene. */
+  autoFoco?: boolean;
 }) {
   const estilos = {
     primario: "bg-acento text-sobre-acento hover:bg-acento-fuerte active:bg-acento-fuerte",
     secundario: "border border-borde-fuerte bg-superficie text-tinta hover:bg-superficie-2 active:bg-borde",
     fantasma: "text-tinta-2 hover:bg-superficie-2 hover:text-tinta active:bg-borde",
+    peligro: "bg-critico text-white hover:bg-critico-texto active:bg-critico-texto",
   }[variante];
   return (
     <button
@@ -256,12 +260,92 @@ export function Boton({
       onClick={onClick}
       disabled={deshabilitado || cargando}
       title={titulo}
+      autoFocus={autoFoco}
       aria-busy={cargando || undefined}
       className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3.5 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4 ${estilos}`}
     >
       {cargando ? <LoaderCircle aria-hidden className="animate-spin" /> : icono}
       {children}
     </button>
+  );
+}
+
+/**
+ * Confirmación dentro de la página (reemplaza a window.confirm). Usa <dialog> nativo: atrapa el foco,
+ * cierra con Esc o con un clic fuera del recuadro, y devuelve el foco a quien lo abrió.
+ */
+export function Confirmacion({
+  abierto,
+  titulo,
+  children,
+  confirmar,
+  cancelar = "Cancelar",
+  peligro,
+  alConfirmar,
+  alCerrar,
+}: {
+  abierto: boolean;
+  titulo: string;
+  children?: ReactNode;
+  confirmar: string;
+  cancelar?: string;
+  peligro?: boolean;
+  alConfirmar: () => void;
+  alCerrar: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (abierto && !d.open) d.showModal();
+    else if (!abierto && d.open) d.close();
+  }, [abierto]);
+
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="confirmacion-titulo"
+      aria-describedby={children ? "confirmacion-texto" : undefined}
+      onClose={alCerrar}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close();
+      }}
+      className="dialogo m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-borde bg-superficie p-0 text-tinta shadow-[0_16px_48px_rgb(0_0_0/0.22)] backdrop:bg-black/45"
+    >
+      <div className="flex flex-col gap-5 p-5">
+        <div className="flex gap-3">
+          {peligro && (
+            <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-critico/10 text-critico-texto">
+              <TriangleAlert className="size-[18px]" />
+            </span>
+          )}
+          <div className="flex min-w-0 flex-col gap-1 pt-1">
+            <h2 id="confirmacion-titulo" className="text-[15px] font-semibold leading-snug text-tinta">
+              {titulo}
+            </h2>
+            {children && (
+              <div id="confirmacion-texto" className="text-sm leading-5 text-tinta-2">
+                {children}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Boton variante="secundario" autoFoco onClick={() => ref.current?.close()}>
+            {cancelar}
+          </Boton>
+          <Boton
+            variante={peligro ? "peligro" : "primario"}
+            onClick={() => {
+              ref.current?.close();
+              alConfirmar();
+            }}
+          >
+            {confirmar}
+          </Boton>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
