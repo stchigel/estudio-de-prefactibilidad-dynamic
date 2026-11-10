@@ -4,7 +4,7 @@ import { Presentation } from "lucide-react";
 import { useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import type { DiapositivaPpt, Entradas, KitsOpcion } from "@/lib/tipos";
-import { Aviso, Boton, Insignia, Seccion } from "./ui";
+import { Aviso, Boton, Seccion } from "./ui";
 
 type Imagen = "logo" | "planta" | "montaje";
 
@@ -175,11 +175,6 @@ export function SeccionPresentacion({
                     <span className={`text-sm font-medium leading-5 ${incluida ? "text-tinta" : "text-tenue"}`}>{d.titulo}</span>
                     {d.nota && (
                       <span className={`mt-0.5 text-xs leading-4 ${habilitada ? "text-tenue" : "text-advertencia-texto"}`}>{d.nota}</span>
-                    )}
-                    {!habilitada && (
-                      <span className="mt-1.5">
-                        <Insignia tono="neutro">No disponible</Insignia>
-                      </span>
                     )}
                   </span>
                   <input

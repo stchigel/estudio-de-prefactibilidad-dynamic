@@ -52,7 +52,7 @@ before first paint. `SelectorTema` in the top bar offers Sistema / Claro / Oscur
 - **Insignia:** a small tinted badge with an inset ring.
 - **Slide picker:** horizontal cards with a thumbnail of the template slide taken from `public/diapositivas/NN.jpg`.
   Regenerate them with `scripts/exportar-miniaturas.ps1`, which needs PowerPoint, whenever the template changes. A conditional slide whose
-  condition isn't met is disabled: dashed border, greyed thumbnail, its note in the warning colour, and a "No disponible" badge.
+  condition isn't met is disabled: dashed border, greyed thumbnail and its note in the warning colour.
 - **Icons:** Lucide only, at 16px in buttons and 14px inline. No unicode glyphs.
 - **Elevation:** borders only. A shadow appears only on floating overlays (the chart tooltip).
 
