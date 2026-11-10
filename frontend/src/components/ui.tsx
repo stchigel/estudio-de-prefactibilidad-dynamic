@@ -1,21 +1,35 @@
 "use client";
 
+import { ChevronDown, CircleAlert, CircleX, Info, LoaderCircle, Monitor, Moon, Sun, SunMedium, TriangleAlert } from "lucide-react";
 import { isValidElement, useState, type ReactNode } from "react";
+import { aplicarTema, leerTema, type Tema } from "@/lib/tema";
 
-export function Seccion({ titulo, children, accion }: { titulo: string; children: ReactNode; accion?: ReactNode }) {
+export function Seccion({
+  titulo,
+  children,
+  accion,
+  id,
+}: {
+  titulo: string;
+  children: ReactNode;
+  accion?: ReactNode;
+  id?: string;
+}) {
   return (
-    <section className="rounded-lg border border-borde bg-superficie p-5">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-base font-semibold text-tinta">{titulo}</h2>
+    <section id={id} aria-labelledby={id ? `${id}-titulo` : undefined} className="rounded-xl border border-borde bg-superficie">
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-borde px-5 py-3">
+        <h2 id={id ? `${id}-titulo` : undefined} className="text-[15px] font-semibold text-tinta">
+          {titulo}
+        </h2>
         {accion}
       </div>
-      {children}
+      <div className="p-5">{children}</div>
     </section>
   );
 }
 
 export function Grilla({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+  return <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>;
 }
 
 export function Campo({
@@ -31,22 +45,30 @@ export function Campo({
   children: ReactNode;
   ancho?: 2 | 4;
 }) {
-  const span = ancho === 4 ? "sm:col-span-2 lg:col-span-4" : ancho === 2 ? "sm:col-span-2" : "";
+  const span = ancho === 4 ? "sm:col-span-2 lg:col-span-3 xl:col-span-4" : ancho === 2 ? "sm:col-span-2" : "";
+  const titulo = <span className="text-[13px] font-medium leading-5 text-tinta-2">{etiqueta}</span>;
   return (
-    <div className={`flex flex-col gap-1 text-sm ${span}`}>
+    <div className={`group flex flex-col gap-1.5 ${span}`} data-invalido={error ? true : undefined}>
       {isValidElement(children) && children.type === SiNo ? (
         // Un grupo de botones se nombra con fieldset/legend; un <label> nombraría solo al primero.
-        <fieldset className="flex flex-col gap-1">
-          <legend className="mb-1 font-medium text-tinta-2">{etiqueta}</legend>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5">{titulo}</legend>
           {children}
         </fieldset>
       ) : (
-        <label className="flex flex-col gap-1">
-          <span className="font-medium text-tinta-2">{etiqueta}</span>
+        <label className="flex flex-col gap-1.5">
+          {titulo}
           {children}
         </label>
       )}
-      {error ? <span className="text-xs text-critico">{error}</span> : ayuda ? <span className="text-xs text-tenue">{ayuda}</span> : null}
+      {error ? (
+        <span className="flex items-start gap-1 text-xs leading-4 text-critico-texto">
+          <CircleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+          {error}
+        </span>
+      ) : ayuda ? (
+        <span className="text-xs leading-4 text-tenue">{ayuda}</span>
+      ) : null}
     </div>
   );
 }
@@ -57,8 +79,8 @@ export function leerNumero(t: string): number {
   return Number(limpio.includes(",") ? limpio.replace(/\./g, "").replace(",", ".") : limpio);
 }
 
-const claseInput =
-  "w-full rounded-md border border-borde bg-plano px-3 py-2 text-sm text-tinta tabular-nums outline-none focus:border-acento focus:ring-2 focus:ring-acento/30 disabled:opacity-50";
+export const claseInput =
+  "h-9 w-full rounded-md border border-borde-fuerte bg-superficie px-3 text-sm text-tinta tabular-nums outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-tenue hover:border-eje focus:border-acento focus:ring-3 focus:ring-acento/20 disabled:cursor-not-allowed disabled:bg-superficie-2 disabled:text-tenue group-data-invalido:border-critico group-data-invalido:focus:ring-critico/20";
 
 /** Número editable. `porcentaje` muestra 0,12 como 12. Acepta coma decimal. */
 export function Numero({
@@ -70,6 +92,8 @@ export function Numero({
   sufijo,
   deshabilitado,
   vacioEsNulo,
+  compacto,
+  etiqueta,
 }: {
   valor: number | null;
   alCambiar: (v: number | null) => void;
@@ -79,6 +103,10 @@ export function Numero({
   sufijo?: string;
   deshabilitado?: boolean;
   vacioEsNulo?: boolean;
+  /** Celda de tabla: más baja y alineada a la derecha para leer columnas de cifras. */
+  compacto?: boolean;
+  /** Nombre accesible cuando el campo no tiene un <label> visible (celdas de tabla). */
+  etiqueta?: string;
 }) {
   const mostrar = (v: number | null) =>
     v == null ? "" : String(porcentaje ? Number((v * 100).toFixed(6)) : v).replace(".", ",");
@@ -91,16 +119,18 @@ export function Numero({
     const comparable = actual == null ? null : porcentaje ? actual / 100 : actual;
     if (comparable !== valor) setTexto(mostrar(valor));
   }
+  const conSufijo = Boolean(sufijo || porcentaje);
 
   return (
     <div className="relative">
       <input
-        className={`${claseInput} ${sufijo || porcentaje ? "pr-12" : ""}`}
+        className={`${claseInput} ${compacto ? "h-8 px-2 text-right" : ""} ${conSufijo ? (sufijo && sufijo.length > 3 ? "pr-20" : "pr-10") : ""}`}
         inputMode="decimal"
         value={texto}
         disabled={deshabilitado}
         min={min}
         step={paso}
+        aria-label={etiqueta}
         onChange={(ev) => {
           const t = ev.target.value;
           setTexto(t);
@@ -109,7 +139,7 @@ export function Numero({
           if (!Number.isNaN(n)) alCambiar(porcentaje ? n / 100 : n);
         }}
       />
-      {(sufijo || porcentaje) && (
+      {conSufijo && (
         <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-tenue">
           {porcentaje ? "%" : sufijo}
         </span>
@@ -120,6 +150,22 @@ export function Numero({
 
 export function Texto({ valor, alCambiar }: { valor: string; alCambiar: (v: string) => void }) {
   return <input className={claseInput} value={valor} onChange={(e) => alCambiar(e.target.value)} />;
+}
+
+/** <select> nativo con la flecha del sistema de diseño. */
+export function Selector({
+  children,
+  className = "",
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }) {
+  return (
+    <div className="relative">
+      <select {...props} className={`${claseInput} cursor-pointer appearance-none pr-9 disabled:cursor-not-allowed ${className}`}>
+        {children}
+      </select>
+      <ChevronDown aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-tenue" />
+    </div>
+  );
 }
 
 export function Opciones<T extends string | number>({
@@ -136,8 +182,7 @@ export function Opciones<T extends string | number>({
   etiquetas?: (v: T) => string;
 }) {
   return (
-    <select
-      className={claseInput}
+    <Selector
       value={valor == null ? "" : String(valor)}
       disabled={deshabilitado}
       onChange={(e) => {
@@ -151,13 +196,13 @@ export function Opciones<T extends string | number>({
           {etiquetas ? etiquetas(o) : String(o)}
         </option>
       ))}
-    </select>
+    </Selector>
   );
 }
 
 export function SiNo({ valor, alCambiar, deshabilitado }: { valor: boolean; alCambiar: (v: boolean) => void; deshabilitado?: boolean }) {
   return (
-    <div className="flex gap-1 rounded-md border border-borde bg-plano p-1" role="radiogroup">
+    <div className="grid h-9 grid-cols-2 gap-0.5 rounded-md border border-borde-fuerte bg-superficie-2 p-0.5" role="radiogroup">
       {[true, false].map((v) => (
         <button
           key={String(v)}
@@ -166,8 +211,8 @@ export function SiNo({ valor, alCambiar, deshabilitado }: { valor: boolean; alCa
           aria-checked={valor === v}
           disabled={deshabilitado}
           onClick={() => alCambiar(v)}
-          className={`flex-1 rounded px-3 py-1 text-sm transition disabled:opacity-50 ${
-            valor === v ? "bg-acento text-white" : "text-tinta-2 hover:bg-borde/50"
+          className={`rounded-[5px] text-sm transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
+            valor === v ? "bg-acento font-medium text-sobre-acento" : "text-tinta-2 hover:bg-superficie hover:text-tinta"
           }`}
         >
           {v ? "Sí" : "No"}
@@ -184,6 +229,8 @@ export function Boton({
   deshabilitado,
   cargando,
   tipo = "button",
+  icono,
+  titulo,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -191,20 +238,25 @@ export function Boton({
   deshabilitado?: boolean;
   cargando?: boolean;
   tipo?: "button" | "submit";
+  /** Ícono a la izquierda del texto; mientras carga se reemplaza por el indicador. */
+  icono?: ReactNode;
+  titulo?: string;
 }) {
   const estilos = {
-    primario: "bg-acento text-white hover:bg-acento-fuerte",
-    secundario: "border border-borde bg-superficie text-tinta hover:bg-plano",
-    fantasma: "text-tinta-2 hover:bg-plano",
+    primario: "bg-acento text-sobre-acento hover:bg-acento-fuerte active:bg-acento-fuerte",
+    secundario: "border border-borde-fuerte bg-superficie text-tinta hover:bg-superficie-2 active:bg-borde",
+    fantasma: "text-tinta-2 hover:bg-superficie-2 hover:text-tinta active:bg-borde",
   }[variante];
   return (
     <button
       type={tipo}
       onClick={onClick}
       disabled={deshabilitado || cargando}
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${estilos}`}
+      title={titulo}
+      aria-busy={cargando || undefined}
+      className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3.5 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4 ${estilos}`}
     >
-      {cargando && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+      {cargando ? <LoaderCircle aria-hidden className="animate-spin" /> : icono}
       {children}
     </button>
   );
@@ -212,28 +264,88 @@ export function Boton({
 
 export function Aviso({ nivel, children }: { nivel: "error" | "advertencia" | "info"; children: ReactNode }) {
   const estilo = {
-    error: "border-critico/40 bg-critico/10",
-    advertencia: "border-advertencia/50 bg-advertencia/10",
-    info: "border-acento/30 bg-acento/5",
+    error: "border-critico/30 bg-critico/[0.07]",
+    advertencia: "border-advertencia/40 bg-advertencia/[0.09]",
+    info: "border-acento/25 bg-acento-suave",
   }[nivel];
-  const icono = { error: "✕", advertencia: "!", info: "i" }[nivel];
+  const Icono = { error: CircleX, advertencia: TriangleAlert, info: Info }[nivel];
+  const tono = { error: "text-critico-texto", advertencia: "text-advertencia-texto", info: "text-acento" }[nivel];
   const etiqueta = { error: "Error", advertencia: "Advertencia", info: "Info" }[nivel];
   return (
-    <div className={`flex gap-3 rounded-md border px-4 py-3 text-sm text-tinta ${estilo}`} role={nivel === "error" ? "alert" : "status"}>
-      <span aria-label={etiqueta} className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-xs font-bold">
-        {icono}
-      </span>
-      <div>{children}</div>
+    <div className={`flex gap-2.5 rounded-lg border px-3.5 py-3 text-sm leading-5 text-tinta ${estilo}`} role={nivel === "error" ? "alert" : "status"}>
+      <Icono role="img" aria-label={etiqueta} className={`mt-px size-4 shrink-0 ${tono}`} />
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
 
 export function Insignia({ children, tono }: { children: ReactNode; tono: "neutro" | "acento" | "advertencia" | "bueno" }) {
   const estilos = {
-    neutro: "bg-borde/60 text-tinta-2",
-    acento: "bg-acento/15 text-acento-fuerte",
-    advertencia: "bg-advertencia/20 text-tinta",
-    bueno: "bg-bueno/15 text-bueno-texto",
+    neutro: "bg-superficie-2 text-tinta-2 ring-borde",
+    acento: "bg-acento-suave text-acento-fuerte ring-acento/25",
+    advertencia: "bg-advertencia/12 text-advertencia-texto ring-advertencia/35",
+    bueno: "bg-bueno/10 text-bueno-texto ring-bueno/30",
   }[tono];
-  return <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${estilos}`}>{children}</span>;
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-px text-xs font-medium ring-1 ring-inset ${estilos}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Barra fija al pie con la navegación del paso: Volver a la izquierda, la acción principal a la derecha. */
+export function BarraAcciones({ children }: { children: ReactNode }) {
+  return (
+    <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-borde bg-plano px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">{children}</div>
+    </div>
+  );
+}
+
+/** Marca de la aplicación: sol sobre el acento, nombre del estudio y de la empresa. */
+export function Marca() {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-acento text-sobre-acento">
+        <SunMedium className="size-[18px]" strokeWidth={2.25} />
+      </span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <h1 className="truncate text-sm font-semibold text-tinta">Estudio de prefactibilidad solar</h1>
+        <span className="truncate text-xs text-tenue">Dynamic Energy</span>
+      </span>
+    </div>
+  );
+}
+
+const TEMAS: { valor: Tema; etiqueta: string; Icono: typeof Sun }[] = [
+  { valor: "sistema", etiqueta: "Tema del sistema", Icono: Monitor },
+  { valor: "claro", etiqueta: "Tema claro", Icono: Sun },
+  { valor: "oscuro", etiqueta: "Tema oscuro", Icono: Moon },
+];
+
+export function SelectorTema() {
+  const [tema, setTema] = useState<Tema>(leerTema);
+  return (
+    <div role="radiogroup" aria-label="Tema" className="flex h-8 items-center gap-0.5 rounded-md border border-borde bg-superficie-2 p-0.5">
+      {TEMAS.map(({ valor, etiqueta, Icono }) => (
+        <button
+          key={valor}
+          type="button"
+          role="radio"
+          aria-checked={tema === valor}
+          aria-label={etiqueta}
+          title={etiqueta}
+          onClick={() => {
+            setTema(valor);
+            aplicarTema(valor);
+          }}
+          className={`flex size-7 items-center justify-center rounded-[5px] transition-colors duration-150 ${
+            tema === valor ? "bg-superficie text-tinta ring-1 ring-borde-fuerte" : "text-tenue hover:text-tinta"
+          }`}
+        >
+          <Icono aria-hidden className="size-3.5" />
+        </button>
+      ))}
+    </div>
+  );
 }

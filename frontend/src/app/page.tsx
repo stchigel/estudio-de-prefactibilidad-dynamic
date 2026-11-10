@@ -7,7 +7,9 @@ import { PasoFacturas } from "@/components/PasoFacturas";
 import { PasoOpciones } from "@/components/PasoOpciones";
 import { PasoProyecto } from "@/components/PasoProyecto";
 import { PasoResultados } from "@/components/PasoResultados";
-import { Aviso, Boton } from "@/components/ui";
+import { Aviso, Boton, Marca, SelectorTema } from "@/components/ui";
+import { Pasos } from "@/components/Pasos";
+import { FilePlus, LoaderCircle, LogOut } from "lucide-react";
 import { api, ErrorApi, EVENTO_SESION_VENCIDA } from "@/lib/api";
 import {
   aplicarSugerencias,
@@ -16,7 +18,6 @@ import {
   entradasNuevoAnalisis,
   guardarBorrador,
   leerBorrador,
-  PASOS,
   type Paso,
 } from "@/lib/estado";
 import type { Entradas, KitsOpcion, OpcionesFormulario, RespuestaExtraccion } from "@/lib/tipos";
@@ -59,7 +60,8 @@ function ControlAcceso() {
   if (estado === "comprobando") return null;
   if (estado === "error") {
     return (
-      <div className="mx-auto w-full max-w-xl px-4 py-8">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-8">
+        <Marca />
         <Aviso nivel="error">{error}</Aviso>
       </div>
     );
@@ -90,7 +92,6 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
   }, [paso, entradas, extraccion, opcionesPpt]);
 
   const actualizar = useCallback((c: Partial<Entradas>) => setEntradas((e) => ({ ...e, ...c })), []);
-  const indice = PASOS.indexOf(paso);
 
   const nueva = () => {
     if (!confirm("¿Descartar la propuesta actual y empezar una nueva?")) return;
@@ -103,57 +104,41 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-acento">Dynamic Energy</p>
-          <h1 className="text-2xl font-semibold text-tinta">Estudio de prefactibilidad solar</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Boton variante="fantasma" onClick={nueva}>
-            Nueva propuesta
-          </Boton>
-          {alSalir && (
-            <Boton variante="fantasma" onClick={alSalir}>
-              Salir
+    <>
+      <header className="sticky top-0 z-30 border-b border-borde bg-superficie">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:px-6">
+          <div className="min-w-0 flex-1 xl:flex-none">
+            <Marca />
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 xl:order-last">
+            <SelectorTema />
+            <Boton variante="fantasma" onClick={nueva} icono={<FilePlus aria-hidden />}>
+              <span className="hidden sm:inline">Nueva propuesta</span>
+              <span className="sr-only sm:hidden">Nueva propuesta</span>
             </Boton>
-          )}
+            {alSalir && (
+              <Boton variante="fantasma" onClick={alSalir} icono={<LogOut aria-hidden />}>
+                <span className="hidden sm:inline">Salir</span>
+                <span className="sr-only sm:hidden">Salir</span>
+              </Boton>
+            )}
+          </div>
+          <Pasos paso={paso} alElegir={setPaso} />
         </div>
       </header>
 
-      <nav aria-label="Pasos" className="mb-8">
-        <ol className="flex flex-wrap gap-2">
-          {PASOS.map((p, i) => {
-            const activo = p === paso;
-            const hecho = i < indice;
-            return (
-              <li key={p}>
-                <button
-                  type="button"
-                  disabled={!hecho}
-                  onClick={() => setPaso(p)}
-                  aria-current={activo ? "step" : undefined}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
-                    activo
-                      ? "border-acento bg-acento text-white"
-                      : hecho
-                        ? "border-borde bg-superficie text-tinta hover:border-acento"
-                        : "border-borde text-tenue"
-                  }`}
-                >
-                  <span className="tabular-nums">{i + 1}</span>
-                  {p}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
+      <main key={paso} className="entrar mx-auto flex w-full max-w-[1280px] flex-1 flex-col px-4 pt-6 sm:px-6">
       {errorCarga && (
         <div className="mb-6">
           <Aviso nivel="error">{errorCarga}</Aviso>
         </div>
+      )}
+
+      {!opciones && !errorCarga && paso !== "Facturas" && paso !== "Consumos" && (
+        <p className="flex items-center gap-2 py-10 text-sm text-tenue" role="status">
+          <LoaderCircle aria-hidden className="size-4 animate-spin" />
+          Cargando opciones del formulario…
+        </p>
       )}
 
       {paso === "Facturas" && (
@@ -211,6 +196,7 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
           alNueva={nueva}
         />
       )}
-    </div>
+      </main>
+    </>
   );
 }

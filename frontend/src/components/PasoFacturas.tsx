@@ -1,11 +1,16 @@
 "use client";
 
+import { FileText, ImageIcon, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import type { RespuestaExtraccion } from "@/lib/tipos";
-import { Aviso, Boton, Seccion } from "./ui";
+import { Aviso, BarraAcciones, Boton, Seccion } from "./ui";
 
 const ACEPTADOS = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+
+function tamano(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB` : `${(bytes / 1024).toFixed(0)} KB`;
+}
 
 export function PasoFacturas({
   archivos,
@@ -49,76 +54,92 @@ export function PasoFacturas({
   };
 
   return (
-    <Seccion titulo="Facturas de luz del cliente">
-      <p className="mb-4 text-sm text-tinta-2">
-        Subí las facturas de la distribuidora (PDF, escaneos o fotos). Con dos facturas EPE se cubre el año; si faltan meses se
-        estiman por espejo respecto del solsticio.
-      </p>
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setArrastrando(true);
-        }}
-        onDragLeave={() => setArrastrando(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setArrastrando(false);
-          agregar(e.dataTransfer.files);
-        }}
-        onClick={() => entrada.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-12 text-center transition ${
-          arrastrando ? "border-acento bg-acento/5" : "border-borde hover:border-acento/60"
-        }`}
-      >
-        <span className="text-sm font-medium text-tinta">Arrastrá las facturas acá o hacé clic para elegirlas</span>
-        <span className="text-xs text-tenue">PDF, JPG o PNG · hasta 30 MB cada una</span>
-        <input
-          ref={entrada}
-          type="file"
-          multiple
-          accept={ACEPTADOS.join(",")}
-          className="hidden"
-          onChange={(e) => {
-            agregar(e.target.files);
-            e.target.value = "";
-          }}
-        />
+    <div className="flex flex-1 flex-col gap-6">
+      <div className="mx-auto w-full max-w-3xl">
+        <Seccion titulo="Facturas de luz del cliente">
+          <p className="mb-4 max-w-[68ch] text-sm text-tinta-2">
+            Subí las facturas de la distribuidora (PDF, escaneos o fotos). Con dos facturas EPE se cubre el año; si faltan meses se
+            estiman por espejo respecto del solsticio.
+          </p>
+          <button
+            type="button"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setArrastrando(true);
+            }}
+            onDragLeave={() => setArrastrando(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setArrastrando(false);
+              agregar(e.dataTransfer.files);
+            }}
+            onClick={() => entrada.current?.click()}
+            className={`flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-10 text-center transition-colors duration-150 ${
+              arrastrando ? "border-acento bg-acento-suave" : "border-borde-fuerte bg-superficie-2/50 hover:border-acento/60 hover:bg-acento-suave/50"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`flex size-10 items-center justify-center rounded-full ${arrastrando ? "bg-acento text-sobre-acento" : "bg-superficie text-tinta-2 ring-1 ring-borde"}`}
+            >
+              <Upload className="size-5" />
+            </span>
+            <span className="text-sm font-medium text-tinta">Arrastrá las facturas acá o hacé clic para elegirlas</span>
+            <span className="text-xs text-tenue">PDF, JPG o PNG · hasta 30 MB cada una</span>
+          </button>
+          <input
+            ref={entrada}
+            type="file"
+            multiple
+            accept={ACEPTADOS.join(",")}
+            className="hidden"
+            onChange={(e) => {
+              agregar(e.target.files);
+              e.target.value = "";
+            }}
+          />
+
+          {archivos.length > 0 && (
+            <ul className="mt-4 divide-y divide-borde overflow-hidden rounded-lg border border-borde">
+              {archivos.map((a, i) => {
+                const Icono = a.type === "application/pdf" ? FileText : ImageIcon;
+                return (
+                  <li key={`${a.name}-${i}`} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <Icono aria-hidden className="size-4 shrink-0 text-tenue" />
+                    <span className="min-w-0 flex-1 truncate text-tinta">{a.name}</span>
+                    <span className="text-xs text-tenue tabular-nums">{tamano(a.size)}</span>
+                    <button
+                      type="button"
+                      className="flex size-7 items-center justify-center rounded-md text-tenue transition-colors hover:bg-critico/10 hover:text-critico-texto"
+                      onClick={() => setArchivos(archivos.filter((_, j) => j !== i))}
+                      aria-label={`Quitar ${a.name}`}
+                      title="Quitar"
+                    >
+                      <X aria-hidden className="size-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {error && (
+            <div className="mt-4">
+              <Aviso nivel="error">{error}</Aviso>
+            </div>
+          )}
+        </Seccion>
       </div>
 
-      {archivos.length > 0 && (
-        <ul className="mt-4 divide-y divide-borde rounded-md border border-borde">
-          {archivos.map((a, i) => (
-            <li key={`${a.name}-${i}`} className="flex items-center justify-between px-4 py-2 text-sm">
-              <span className="truncate text-tinta">{a.name}</span>
-              <span className="flex items-center gap-3">
-                <span className="text-xs text-tenue tabular-nums">{(a.size / 1024).toFixed(0)} KB</span>
-                <button
-                  className="text-xs text-tinta-2 hover:text-critico"
-                  onClick={() => setArchivos(archivos.filter((_, j) => j !== i))}
-                  aria-label={`Quitar ${a.name}`}
-                >
-                  Quitar
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {error && (
-        <div className="mt-4">
-          <Aviso nivel="error">{error}</Aviso>
-        </div>
-      )}
-
-      <div className="mt-6 flex flex-wrap justify-end gap-3">
+      <div className="flex-1" />
+      <BarraAcciones>
         <Boton variante="fantasma" onClick={alSaltear}>
           Cargar consumos a mano
         </Boton>
         <Boton onClick={extraer} deshabilitado={!archivos.length} cargando={cargando}>
           {cargando ? "Leyendo facturas…" : "Extraer datos"}
         </Boton>
-      </div>
-    </Seccion>
+      </BarraAcciones>
+    </div>
   );
 }

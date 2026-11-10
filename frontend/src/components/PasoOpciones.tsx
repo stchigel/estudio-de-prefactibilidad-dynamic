@@ -1,10 +1,11 @@
 "use client";
 
+import { ArrowLeft, ChevronDown, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import { fmt } from "@/lib/estado";
 import type { Entradas, Kit, KitsOpcion, Opcion, OpcionesFormulario, ResultadoBusqueda } from "@/lib/tipos";
-import { Aviso, Boton, Campo, Grilla, Insignia, Numero, Opciones, Seccion, SiNo } from "./ui";
+import { Aviso, BarraAcciones, Boton, Campo, Grilla, Insignia, Numero, Opciones, Seccion, SiNo } from "./ui";
 
 export function describirKits(k1: Kit, k2: Kit | null) {
   const parte = (k: Kit) => `${k.cantidad} × ${fmt.n(k.kwp, 2)} kWp`;
@@ -111,30 +112,35 @@ export function PasoOpciones({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-6">
       <Seccion titulo="Opciones propuestas">
-        {!busqueda && !error && <p className="text-sm text-tinta-2">Evaluando combinaciones de kits…</p>}
+        {!busqueda && !error && (
+          <p className="flex items-center gap-2 py-6 text-sm text-tinta-2" role="status">
+            <LoaderCircle aria-hidden className="size-4 animate-spin text-tenue" />
+            Evaluando combinaciones de kits…
+          </p>
+        )}
         {error && <Aviso nivel="error">{error}</Aviso>}
         {busqueda && filas.length === 0 && (
           <Aviso nivel="advertencia">Ninguna combinación del catálogo cumple las restricciones. Agregá los kits a mano.</Aviso>
         )}
         {busqueda && filas.length > 0 && (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm tabular-nums">
+            <div className="-mx-5 -mt-5 overflow-x-auto">
+              <table className="w-full min-w-[960px] text-sm tabular-nums">
                 <thead>
-                  <tr className="border-b border-borde text-left text-xs text-tenue">
-                    <th className="py-2 pr-2 font-medium">Elegir</th>
-                    <th className="px-2 font-medium">En el PPT</th>
-                    <th className="px-2 font-medium">Kits</th>
-                    <th className="px-2 text-right font-medium">Potencia</th>
-                    <th className="px-2 text-right font-medium">Cobertura</th>
-                    <th className="px-2 text-right font-medium">Autoconsumo</th>
-                    <th className="px-2 text-right font-medium">Inversión</th>
-                    <th className="px-2 text-right font-medium">Ahorro anual</th>
-                    <th className="px-2 text-right font-medium">ROI</th>
-                    <th className="px-2 text-right font-medium">TIR</th>
-                    <th className="pl-2 text-right font-medium">Superficie</th>
+                  <tr className="border-b border-borde bg-superficie-2 text-left text-xs text-tinta-2">
+                    <th scope="col" className="py-2 pl-5 pr-2 font-medium">Elegir</th>
+                    <th scope="col" className="px-2 font-medium">En el PPT</th>
+                    <th scope="col" className="px-2 font-medium">Kits</th>
+                    <th scope="col" className="px-2 text-right font-medium">Potencia</th>
+                    <th scope="col" className="px-2 text-right font-medium">Cobertura</th>
+                    <th scope="col" className="px-2 text-right font-medium">Autoconsumo</th>
+                    <th scope="col" className="px-2 text-right font-medium">Inversión</th>
+                    <th scope="col" className="px-2 text-right font-medium">Ahorro anual</th>
+                    <th scope="col" className="px-2 text-right font-medium">ROI</th>
+                    <th scope="col" className="px-2 text-right font-medium">TIR</th>
+                    <th scope="col" className="pl-2 pr-5 text-right font-medium">Superficie</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -147,11 +153,12 @@ export function PasoOpciones({
                       <tr
                         key={k}
                         onClick={() => setElegida(k)}
-                        className={`cursor-pointer border-b border-borde/60 last:border-0 ${esElegida ? "bg-acento/10" : "hover:bg-plano"} ${
-                          fuera ? "text-tenue opacity-60" : ""
-                        }`}
+
+                        className={`cursor-pointer border-b border-borde transition-colors duration-150 last:border-0 ${
+                          esElegida ? "bg-acento-suave" : "hover:bg-superficie-2/70"
+                        } ${fuera ? "text-tenue" : "text-tinta"}`}
                       >
-                        <td className="py-2 pr-2">
+                        <td className="py-2.5 pl-5 pr-2">
                           <input type="radio" checked={esElegida} onChange={() => setElegida(k)} aria-label={`Elegir ${describirKits(o.kit1, o.kit2)}`} />
                         </td>
                         <td className="px-2" onClick={(ev) => ev.stopPropagation()}>
@@ -164,7 +171,7 @@ export function PasoOpciones({
                             title={esElegida ? "La opción elegida siempre se incluye" : undefined}
                           />
                         </td>
-                        <td className="px-2">
+                        <td className={`px-2 ${esElegida ? "font-medium" : ""}`}>
                           <span className="flex flex-wrap items-center gap-2">
                             {describirKits(o.kit1, o.kit2)}
                             {o.recomendada && <Insignia tono="bueno">Recomendada</Insignia>}
@@ -179,14 +186,14 @@ export function PasoOpciones({
                         <td className="px-2 text-right">{fmt.usd(r.economia.ahorro_anual_usd)}</td>
                         <td className="px-2 text-right">{fmt.anios(r.roi_anios)}</td>
                         <td className="px-2 text-right">{fmt.pct(r.van_tir.tir, 1)}</td>
-                        <td className="pl-2 text-right">{fmt.entero(r.superficie_m2)} m²</td>
+                        <td className="pl-2 pr-5 text-right">{fmt.entero(r.superficie_m2)} m²</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 space-y-1 text-xs text-tinta-2">
+            <div className="mt-4 max-w-[90ch] space-y-1 text-xs leading-5 text-tinta-2">
               <p>
                 Se muestra la recomendada, dos tamaños más chicos y dos más grandes. La recomendada es la de mejor ROI; ante diferencias
                 menores a 0,2 años se prefiere la de mayor cobertura, pero se muestran las dos combinaciones. Se evaluaron{" "}
@@ -211,7 +218,11 @@ export function PasoOpciones({
       <Seccion
         titulo="Agregar kits a mano"
         accion={
-          <Boton variante="fantasma" onClick={() => setManual(!manual)}>
+          <Boton
+            variante="fantasma"
+            onClick={() => setManual(!manual)}
+            icono={<ChevronDown aria-hidden className={`transition-transform duration-150 ${manual ? "rotate-180" : ""}`} />}
+          >
             {manual ? "Ocultar" : "Mostrar"}
           </Boton>
         }
@@ -246,9 +257,9 @@ export function PasoOpciones({
               )}
             </Grilla>
             {errorAgregar && <Aviso nivel="error">{errorAgregar}</Aviso>}
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <span className="text-xs text-tenue">Se suma a la tabla de arriba y queda elegida; después se puede cambiar.</span>
-              <Boton variante="secundario" onClick={agregar} deshabilitado={kit1.cantidad < 1} cargando={agregando}>
+              <Boton variante="secundario" onClick={agregar} deshabilitado={kit1.cantidad < 1} cargando={agregando} icono={<Plus aria-hidden />}>
                 Agregar a la tabla
               </Boton>
             </div>
@@ -258,14 +269,15 @@ export function PasoOpciones({
         )}
       </Seccion>
 
-      <div className="flex justify-between">
-        <Boton variante="secundario" onClick={alVolver}>
+      <div className="flex-1" />
+      <BarraAcciones>
+        <Boton variante="secundario" onClick={alVolver} icono={<ArrowLeft aria-hidden />}>
           Volver
         </Boton>
         <Boton onClick={verResultados} deshabilitado={!elegida || filas.length === 0}>
           Ver resultados
         </Boton>
-      </div>
+      </BarraAcciones>
     </div>
   );
 }

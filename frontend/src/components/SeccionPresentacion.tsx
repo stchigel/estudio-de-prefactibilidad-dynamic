@@ -1,5 +1,6 @@
 "use client";
 
+import { Presentation } from "lucide-react";
 import { useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import type { DiapositivaPpt, Entradas, KitsOpcion } from "@/lib/tipos";
@@ -23,7 +24,7 @@ const TEXTO_CFI_POR_DEFECTO = [
 ].join("\n");
 
 const claseTexto =
-  "w-full rounded-md border border-borde bg-plano px-3 py-2 text-sm text-tinta outline-none focus:border-acento focus:ring-2 focus:ring-acento/30";
+  "w-full rounded-md border border-borde-fuerte bg-superficie px-3 py-2 text-sm leading-5 text-tinta outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-tenue hover:border-eje focus:border-acento focus:ring-3 focus:ring-acento/20";
 
 export function SeccionPresentacion({
   e,
@@ -70,19 +71,19 @@ export function SeccionPresentacion({
     <Seccion
       titulo="Presentación"
       accion={
-        <Boton onClick={generar} cargando={generando}>
+        <Boton onClick={generar} cargando={generando} icono={<Presentation aria-hidden />}>
           Descargar PowerPoint
         </Boton>
       }
     >
       <div className="grid gap-4 lg:grid-cols-3">
         {IMAGENES.map(({ clave, etiqueta, ayuda }) => (
-          <label key={clave} className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-tinta-2">{etiqueta}</span>
+          <label key={clave} className="flex flex-col gap-1.5 text-sm">
+            <span className="text-[13px] font-medium text-tinta-2">{etiqueta}</span>
             <input
               type="file"
               accept="image/png,image/jpeg"
-              className="text-sm text-tinta-2 file:mr-3 file:rounded-md file:border file:border-borde file:bg-plano file:px-3 file:py-1.5 file:text-sm file:text-tinta"
+              className="w-full cursor-pointer rounded-md border border-borde-fuerte bg-superficie text-sm text-tinta-2 transition-colors hover:border-eje file:mr-3 file:h-9 file:cursor-pointer file:border-0 file:border-r file:border-borde-fuerte file:bg-superficie-2 file:px-3 file:text-sm file:font-medium file:text-tinta"
               onChange={(ev) => setImagenes({ ...imagenes, [clave]: ev.target.files?.[0] })}
             />
             <span className="text-xs text-tenue">{imagenes[clave] ? imagenes[clave]!.name : `Opcional · diapositiva "${ayuda}"`}</span>
@@ -90,27 +91,28 @@ export function SeccionPresentacion({
         ))}
       </div>
 
-      <fieldset className="mt-5">
-        <legend className="mb-2 flex w-full items-center justify-between text-sm font-medium text-tinta-2">
-          <span>Páginas de la presentación</span>
+      <fieldset className="mt-6 border-t border-borde pt-5">
+        <legend className="sr-only">Páginas de la presentación</legend>
+        <div className="mb-2 flex w-full items-center justify-between text-[13px] font-medium text-tinta-2">
+          <span aria-hidden>Páginas de la presentación</span>
           <span className="flex gap-3 text-xs font-normal">
-            <button type="button" className="text-acento hover:underline" onClick={() => setExcluidas(new Set())}>
+            <button type="button" className="rounded font-medium text-acento underline-offset-2 hover:underline" onClick={() => setExcluidas(new Set())}>
               Todas
             </button>
             <button
               type="button"
-              className="text-acento hover:underline"
+              className="rounded font-medium text-acento underline-offset-2 hover:underline"
               onClick={() => setExcluidas(new Set(diapositivas.map((d) => d.numero)))}
             >
               Ninguna
             </button>
           </span>
-        </legend>
+        </div>
         <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
           {diapositivas.map((d) => (
             <li key={d.numero}>
-              <label className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-plano">
-                <input type="checkbox" className="mt-1" checked={!excluidas.has(d.numero)} onChange={() => alternar(d.numero)} />
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-superficie-2">
+                <input type="checkbox" className="mt-0.5 shrink-0" checked={!excluidas.has(d.numero)} onChange={() => alternar(d.numero)} />
                 <span className="text-tinta">
                   <span className="tabular-nums text-tenue">{d.numero}.</span> {d.titulo}
                   {d.nota && <span className="block text-xs text-tenue">{d.nota}</span>}
@@ -121,14 +123,14 @@ export function SeccionPresentacion({
         </ul>
       </fieldset>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-tinta-2">Texto CFI (financiamiento propio)</span>
+      <div className="mt-6 grid gap-4 border-t border-borde pt-5 lg:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-[13px] font-medium text-tinta-2">Texto CFI (financiamiento propio)</span>
           <textarea rows={6} value={textoCfi} onChange={(ev) => setTextoCfi(ev.target.value)} className={claseTexto} />
           <span className="text-xs text-tenue">Una línea por renglón. Vacío = no se muestra el bloque CFI.</span>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-tinta-2">Financiación bancaria</span>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-[13px] font-medium text-tinta-2">Financiación bancaria</span>
           <textarea
             rows={6}
             value={textoBancario}
@@ -138,7 +140,7 @@ export function SeccionPresentacion({
           />
         </label>
       </div>
-      <p className="mt-3 text-xs text-tenue">
+      <p className="mt-4 text-xs text-tenue">
         Sin imágenes quedan los marcadores de la plantilla para completarlos a mano. La tabla de opciones usa las tildadas en el paso
         anterior.
       </p>

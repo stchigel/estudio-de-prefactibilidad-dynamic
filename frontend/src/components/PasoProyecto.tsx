@@ -1,11 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import type { Alerta, Entradas, OpcionesFormulario, Sugerencias } from "@/lib/tipos";
-import { Aviso, Boton, Campo, Grilla, Numero, Opciones, Seccion, SiNo, Texto } from "./ui";
+import { Aviso, BarraAcciones, Boton, Campo, claseInput, Grilla, Numero, Opciones, Seccion, SiNo, Texto } from "./ui";
 
 type Actualizar = (cambios: Partial<Entradas>) => void;
+
+type IdSeccion = "propuesta" | "costos" | "sistema" | "baterias" | "ajustes" | "financiacion" | "ppa";
+
+/** Sección del formulario a la que pertenece el campo de una alerta de validación. */
+function seccionDe(campo: string | null | undefined): IdSeccion | null {
+  if (!campo) return null;
+  if (campo.startsWith("baterias")) return "baterias";
+  if (campo.startsWith("financiacion")) return "financiacion";
+  if (campo.startsWith("ppa")) return "ppa";
+  if (campo.startsWith("capacitores")) return "sistema";
+  if (/^(costo_|tasa_mayorista|tasa_cammesa|tasa_976|tasas_mun_prov|res281|retribucion|potencia_contratada_cammesa)/.test(campo)) return "costos";
+  if (/^(tipo_inversor|inhibicion|banco_capacitores|instalacion|acimut|inclinacion|inversor)/.test(campo)) return "sistema";
+  if (/^(k_incertidumbre|comision|tasa_descuento|periodo_evaluacion)/.test(campo)) return "ajustes";
+  return "propuesta";
+}
+
+function irA(id: string) {
+  const reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: reducido ? "auto" : "smooth", block: "start" });
+}
+
+/** Sección visible: la última cuyo título ya pasó por debajo de la barra superior. */
+function useSeccionActiva(ids: string[]) {
+  const [activa, setActiva] = useState(ids[0]);
+  const clave = ids.join(",");
+  useEffect(() => {
+    const lista = clave.split(",");
+    let cuadro = 0;
+    const medir = () => {
+      cuadro = 0;
+      const limite = window.innerHeight * 0.35;
+      let actual = lista[0];
+      for (const id of lista) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= limite) actual = id;
+      }
+      // Al llegar al final, la última sección queda activa aunque sea corta.
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) actual = lista[lista.length - 1];
+      setActiva(actual);
+    };
+    const alMover = () => {
+      if (!cuadro) cuadro = requestAnimationFrame(medir);
+    };
+    medir();
+    window.addEventListener("scroll", alMover, { passive: true });
+    window.addEventListener("resize", alMover);
+    return () => {
+      window.removeEventListener("scroll", alMover);
+      window.removeEventListener("resize", alMover);
+      if (cuadro) cancelAnimationFrame(cuadro);
+    };
+  }, [clave]);
+  return activa;
+}
+
+function IndiceSecciones({
+  secciones,
+  activa,
+  errores,
+}: {
+  secciones: { id: IdSeccion; titulo: string; estado?: string }[];
+  activa: string;
+  errores: Partial<Record<IdSeccion, number>>;
+}) {
+  return (
+    <nav aria-label="Secciones del proyecto" className="hidden lg:block">
+      <ul className="sticky top-[7.5rem] flex flex-col gap-0.5 xl:top-20">
+        {secciones.map(({ id, titulo, estado }) => {
+          const esActiva = id === activa;
+          const n = errores[id] ?? 0;
+          return (
+            <li key={id}>
+              <a
+                href={`#${id}`}
+                onClick={(ev) => {
+                  ev.preventDefault();
+                  irA(id);
+                  history.replaceState(null, "", `#${id}`);
+                }}
+                aria-current={esActiva ? "location" : undefined}
+                className={`flex items-start justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors duration-150 ${
+                  esActiva ? "bg-superficie font-medium text-tinta ring-1 ring-borde" : "text-tinta-2 hover:bg-superficie-2 hover:text-tinta"
+                }`}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate">{titulo}</span>
+                  {estado && <span className="truncate text-xs font-normal text-tenue">{estado}</span>}
+                </span>
+                {n > 0 && (
+                  <span
+                    className="mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-critico px-1.5 text-[11px] font-semibold tabular-nums text-white"
+                    aria-label={`${n} ${n === 1 ? "error" : "errores"}`}
+                  >
+                    {n}
+                  </span>
+                )}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
 
 export function PasoProyecto({
   e,
@@ -51,7 +156,9 @@ export function PasoProyecto({
       // Los kits los define la búsqueda de opciones: sus errores no frenan este paso.
       const relevantes = lista.filter((a) => !a.campo?.startsWith("kit"));
       setAlertas(relevantes);
-      if (!relevantes.some((a) => a.nivel === "error")) alContinuar();
+      const primera = relevantes.find((a) => a.nivel === "error");
+      if (!primera) alContinuar();
+      else requestAnimationFrame(() => irA(seccionDe(primera.campo) ?? "propuesta"));
     } catch (err) {
       setErrorRed((err as ErrorApi).message ?? "No se pudo validar");
     } finally {
@@ -59,9 +166,32 @@ export function PasoProyecto({
     }
   };
 
+  const errores: Partial<Record<IdSeccion, number>> = {};
+  for (const a of alertas) {
+    const id = a.nivel === "error" ? seccionDe(a.campo) : null;
+    if (id) errores[id] = (errores[id] ?? 0) + 1;
+  }
+  const secciones: { id: IdSeccion; titulo: string; estado?: string }[] = [
+    { id: "propuesta", titulo: "Propuesta y cliente", estado: e.cliente || undefined },
+    { id: "costos", titulo: "Costos de energía" },
+    { id: "sistema", titulo: "Sistema", estado: `${e.tipo_inversor} · ${e.instalacion}` },
+    ...(hibrido ? [{ id: "baterias" as const, titulo: "Baterías", estado: b.incluye ? (b.modelo ?? "Sin modelo") : "No incluye" }] : []),
+    { id: "ajustes", titulo: "Ajustes y evaluación" },
+    {
+      id: "financiacion",
+      titulo: "Financiación",
+      estado: e.financiacion.porcentaje > 0 ? `${Number((e.financiacion.porcentaje * 100).toFixed(2)).toString().replace(".", ",")} % a financiar` : "Sin financiación",
+    },
+    { id: "ppa", titulo: "PPA", estado: e.ppa.aplica ? `${e.ppa.periodo_contrato} años` : "No aplica" },
+  ];
+  const activa = useSeccionActiva(secciones.map((x) => x.id));
+
   return (
-    <div className="space-y-6">
-      <Seccion titulo="Propuesta y cliente">
+    <div className="flex flex-1 flex-col gap-6">
+      <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        <IndiceSecciones secciones={secciones} activa={activa} errores={errores} />
+        <div className="flex min-w-0 flex-col gap-6">
+      <Seccion id="propuesta" titulo="Propuesta y cliente">
         <Grilla>
           <Campo etiqueta="N° de propuesta">
             <Numero valor={e.numero_propuesta} vacioEsNulo alCambiar={(v) => alCambiar({ numero_propuesta: v })} />
@@ -69,7 +199,7 @@ export function PasoProyecto({
           <Campo etiqueta="Fecha">
             <input
               type="date"
-              className="w-full rounded-md border border-borde bg-plano px-3 py-2 text-sm"
+              className={claseInput}
               value={e.fecha ?? ""}
               onChange={(ev) => alCambiar({ fecha: ev.target.value || null })}
             />
@@ -112,7 +242,7 @@ export function PasoProyecto({
         </Grilla>
       </Seccion>
 
-      <Seccion titulo="Costos de energía">
+      <Seccion id="costos" titulo="Costos de energía">
         <Grilla>
           <Campo etiqueta="Costo mayorista">
             <Numero valor={e.costo_mayorista} sufijo="$/kWh" alCambiar={(v) => alCambiar({ costo_mayorista: v ?? 0 })} />
@@ -155,7 +285,7 @@ export function PasoProyecto({
         </Grilla>
       </Seccion>
 
-      <Seccion titulo="Sistema">
+      <Seccion id="sistema" titulo="Sistema">
         <Grilla>
           <Campo etiqueta="Tipo de inversor">
             <Opciones
@@ -194,7 +324,7 @@ export function PasoProyecto({
           </Campo>
         </Grilla>
         {e.banco_capacitores && (
-          <div className="mt-4 border-t border-borde pt-4">
+          <div className="mt-5 border-t border-borde pt-5">
             {sugerencias?.cargo_factor_potencia && (
               <div className="mb-4">
                 <Aviso nivel="info">
@@ -228,7 +358,7 @@ export function PasoProyecto({
       </Seccion>
 
       {hibrido && (
-        <Seccion titulo="Baterías">
+        <Seccion id="baterias" titulo="Baterías">
           <Grilla>
             <Campo etiqueta="Incluye baterías" ayuda={b.incluye ? "Requiere inversor Deye Hib" : undefined}>
               <SiNo valor={b.incluye} alCambiar={(v) => setBaterias({ incluye: v })} />
@@ -269,7 +399,7 @@ export function PasoProyecto({
         </Seccion>
       )}
 
-      <Seccion titulo="Ajustes y evaluación">
+      <Seccion id="ajustes" titulo="Ajustes y evaluación">
         <Grilla>
           <Campo etiqueta="K incertidumbre">
             <Numero valor={e.k_incertidumbre} porcentaje alCambiar={(v) => alCambiar({ k_incertidumbre: v ?? 0 })} />
@@ -291,7 +421,7 @@ export function PasoProyecto({
         </Grilla>
       </Seccion>
 
-      <Seccion titulo="Financiación">
+      <Seccion id="financiacion" titulo="Financiación">
         <Grilla>
           <Campo etiqueta="% a financiar">
             <Numero valor={e.financiacion.porcentaje} porcentaje alCambiar={(v) => alCambiar({ financiacion: { ...e.financiacion, porcentaje: v ?? 0 } })} />
@@ -342,7 +472,7 @@ export function PasoProyecto({
         </Grilla>
       </Seccion>
 
-      <Seccion titulo="PPA">
+      <Seccion id="ppa" titulo="PPA">
         <Grilla>
           <Campo etiqueta="Aplica PPA">
             <SiNo valor={e.ppa.aplica} alCambiar={(v) => alCambiar({ ppa: { ...e.ppa, aplica: v } })} />
@@ -384,15 +514,17 @@ export function PasoProyecto({
         </div>
       )}
       {errorRed && <Aviso nivel="error">{errorRed}</Aviso>}
+        </div>
+      </div>
 
-      <div className="flex justify-between">
-        <Boton variante="secundario" onClick={alVolver}>
+      <BarraAcciones>
+        <Boton variante="secundario" onClick={alVolver} icono={<ArrowLeft aria-hidden />}>
           Volver
         </Boton>
         <Boton onClick={continuar} cargando={validando}>
           Buscar opciones
         </Boton>
-      </div>
+      </BarraAcciones>
     </div>
   );
 }

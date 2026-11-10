@@ -1,80 +1,193 @@
 @import "tailwindcss";
 
-/* Tokens: superficies, tintas y series (paleta categórica validada, modo claro/oscuro). */
+/*
+ * Tokens: neutros fríos, un acento azul (acciones, selección, foco) y colores de estado.
+ * Las series de los gráficos conservan sus tonos (azul = consumo / pagos, naranja = generación / ahorros).
+ * Tema: sigue al sistema; data-theme="light" | "dark" en <html> lo fija a mano (ver TemaSelector).
+ */
 :root {
   color-scheme: light;
-  --plano: #f9f9f7;
-  --superficie: #fcfcfb;
-  --tinta: #0b0b0b;
-  --tinta-2: #52514e;
-  --tenue: #898781;
-  --borde: #e1e0d9;
-  --eje: #c3c2b7;
-  --acento: #2a78d6;
-  --acento-fuerte: #1c5cab;
+  --plano: #f5f6f8;
+  --superficie: #ffffff;
+  --superficie-2: #f0f2f5;
+  --tinta: #0e1621;
+  --tinta-2: #48525f;
+  --tenue: #667080;
+  --borde: #e2e5ea;
+  --borde-fuerte: #ccd2da;
+  --eje: #c3c9d1;
+  --acento: #2266d4;
+  --acento-fuerte: #1a51ab;
+  --acento-suave: #e9f0fc;
+  --sobre-acento: #ffffff;
   --serie-1: #2a78d6; /* azul: consumo / pagos */
   --serie-2: #eb6834; /* naranja: generación / ahorros */
-  --bueno: #0ca30c;
-  --bueno-texto: #006300;
-  --advertencia: #fab219;
+  --bueno: #16a34a;
+  --bueno-texto: #146c34;
+  --advertencia: #f0a50a;
+  --advertencia-texto: #8a5300;
   --critico: #d03b3b;
+  --critico-texto: #b42727;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --plano: #0d0d0d;
-    --superficie: #1a1a19;
-    --tinta: #ffffff;
-    --tinta-2: #c3c2b7;
-    --tenue: #898781;
-    --borde: #2c2c2a;
-    --eje: #383835;
-    --acento: #3987e5;
-    --acento-fuerte: #6da7ec;
+    --plano: #0b0d10;
+    --superficie: #14171c;
+    --superficie-2: #1b1f26;
+    --tinta: #edf0f4;
+    --tinta-2: #b3bbc6;
+    --tenue: #8a939f;
+    --borde: #252a32;
+    --borde-fuerte: #353c46;
+    --eje: #3a414b;
+    --acento: #4b8cf0;
+    --acento-fuerte: #7cabf5;
+    --acento-suave: #172338;
+    --sobre-acento: #ffffff;
     --serie-1: #3987e5;
     --serie-2: #d95926;
-    --bueno-texto: #0ca30c;
+    --bueno: #22b35a;
+    --bueno-texto: #4cc77a;
+    --advertencia: #f0a50a;
+    --advertencia-texto: #f2b84b;
+    --critico: #e05252;
+    --critico-texto: #f07a7a;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --plano: #0d0d0d;
-  --superficie: #1a1a19;
-  --tinta: #ffffff;
-  --tinta-2: #c3c2b7;
-  --tenue: #898781;
-  --borde: #2c2c2a;
-  --eje: #383835;
-  --acento: #3987e5;
-  --acento-fuerte: #6da7ec;
+  --plano: #0b0d10;
+  --superficie: #14171c;
+  --superficie-2: #1b1f26;
+  --tinta: #edf0f4;
+  --tinta-2: #b3bbc6;
+  --tenue: #8a939f;
+  --borde: #252a32;
+  --borde-fuerte: #353c46;
+  --eje: #3a414b;
+  --acento: #4b8cf0;
+  --acento-fuerte: #7cabf5;
+  --acento-suave: #172338;
+  --sobre-acento: #ffffff;
   --serie-1: #3987e5;
   --serie-2: #d95926;
-  --bueno-texto: #0ca30c;
+  --bueno: #22b35a;
+  --bueno-texto: #4cc77a;
+  --advertencia: #f0a50a;
+  --advertencia-texto: #f2b84b;
+  --critico: #e05252;
+  --critico-texto: #f07a7a;
 }
 
 @theme inline {
   --color-plano: var(--plano);
   --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
   --color-tinta: var(--tinta);
   --color-tinta-2: var(--tinta-2);
   --color-tenue: var(--tenue);
   --color-borde: var(--borde);
+  --color-borde-fuerte: var(--borde-fuerte);
   --color-eje: var(--eje);
   --color-acento: var(--acento);
   --color-acento-fuerte: var(--acento-fuerte);
+  --color-acento-suave: var(--acento-suave);
+  --color-sobre-acento: var(--sobre-acento);
   --color-serie-1: var(--serie-1);
   --color-serie-2: var(--serie-2);
   --color-bueno: var(--bueno);
   --color-bueno-texto: var(--bueno-texto);
   --color-advertencia: var(--advertencia);
+  --color-advertencia-texto: var(--advertencia-texto);
   --color-critico: var(--critico);
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-critico-texto: var(--critico-texto);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  /* Deja lugar a la barra superior fija (dos renglones en pantallas angostas) al saltar a una sección. */
+  scroll-padding-top: 7.5rem;
+}
+
+@media (min-width: 80rem) {
+  html {
+    scroll-padding-top: 5rem;
+  }
 }
 
 body {
   background: var(--plano);
   color: var(--tinta);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  caret-color: var(--acento);
+  accent-color: var(--acento);
+  scrollbar-color: var(--borde-fuerte) transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--acento) 28%, transparent);
+  color: var(--tinta);
+}
+
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  /* Los campos llevan su propio anillo (borde + sombra). */
+  outline: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+/* El ícono del calendario sigue al tema en el modo oscuro. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Cambio de paso: el contenido nuevo aparece sin coreografía. */
+.entrar {
+  animation: entrar 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
