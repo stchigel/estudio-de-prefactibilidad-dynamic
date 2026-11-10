@@ -114,11 +114,17 @@ consumos se cargan a mano.
 | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Key del proveedor elegido |
 | `EXTRACCION_MODELO` | Forzar un modelo (por defecto `gemini-3.5-flash` / `claude-sonnet-5-5`) |
 | `EXTRACCION_ESFUERZO` | Solo Claude: `low` (por defecto) / `medium` / `high` |
+| `ACCESS_PASSWORD` / `SESSION_SECRET` / `CORS_ORIGINS` | Solo al publicar en internet (contraseña de acceso, firma de sesión, URL del frontend); ver [deploy/](deploy/README.md) |
 
 El frontend reenvía las llamadas a `/api` al backend (`BACKEND_URL`, por defecto
 `http://127.0.0.1:8000`), así que desde otras PCs solo hace falta llegar al puerto 3000.
 Para abrir la aplicación en modo desarrollo desde otra IP o nombre de host, agregarlo a
 `allowedDevOrigins` en [frontend/next.config.ts](frontend/next.config.ts).
+
+## Publicar en internet
+
+Frontend estático en un hosting con cPanel y backend en un VPS, con contraseña de acceso:
+ver [deploy/README.md](deploy/README.md). El uso local (`iniciar.bat`) no cambia.
 
 ## Tests
 
