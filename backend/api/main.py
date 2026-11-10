@@ -5,6 +5,7 @@ Correr:  uvicorn api.main:app --reload   (desde backend/)
 
 from __future__ import annotations
 
+import os
 import re
 import tempfile
 from dataclasses import replace
@@ -13,7 +14,7 @@ from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -21,6 +22,7 @@ from PIL import UnidentifiedImageError
 from pydantic import BaseModel, ValidationError
 from starlette.background import BackgroundTask
 
+from api import acceso
 from exportes.excel import exportar_excel
 from exportes.powerpoint import DIAPOSITIVA_OPCIONES, DIAPOSITIVAS, DatosPpt, OpcionPpt, generar_ppt
 from extraccion.derivados import sugerir
@@ -52,10 +54,22 @@ from motor.validaciones import sugerir_pdu_rack, validar
 # Configuración local (API keys, proveedor de IA): backend/.env, ver .env.example.
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-app = FastAPI(title="Prefactibilidad Solar — Dynamic Energy", version="0.1.0")
+acceso.verificar_configuracion()
+
+# Orígenes desde los que el navegador puede llamar a la API (separados por coma). Por defecto, solo el
+# frontend local; en producción, la URL donde se publica el frontend estático (ver .env.example).
+ORIGENES_PERMITIDOS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
+
+app = FastAPI(
+    title="Prefactibilidad Solar — Dynamic Energy",
+    version="0.1.0",
+    dependencies=[Depends(acceso.requiere_sesion)],
+)
+app.include_router(acceso.router)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ORIGENES_PERMITIDOS,
+    allow_credentials=True,  # la cookie de sesión viaja en pedidos entre frontend y API
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
@@ -234,8 +248,9 @@ TAMANIO_MAXIMO_FACTURA = 30 * 1024 * 1024  # límite de la API de Claude: 32 MB 
 
 
 @app.post("/api/facturas/extraer")
-async def extraer_facturas(archivos: list[UploadFile]) -> dict[str, Any]:
+async def extraer_facturas(request: Request, archivos: list[UploadFile]) -> dict[str, Any]:
     """Extrae cada factura (§5.2) y devuelve los datos sugeridos para el formulario (§5.3–5.4)."""
+    acceso.limitar_facturas(request, len(archivos))  # cada factura gasta crédito de la API de IA
     extraidas = []
     for archivo in archivos:
         contenido = await archivo.read()
