@@ -86,6 +86,8 @@ export interface Borrador {
   extraccion: RespuestaExtraccion | null;
   /** Opciones tildadas para la tabla del PowerPoint; null = todas. */
   opcionesPpt?: KitsOpcion[] | null;
+  /** Cuántas opciones van a la tabla del PowerPoint (decide si sale la diapositiva de opciones). */
+  cantidadOpcionesPpt?: number | null;
 }
 
 const CLAVE = "prefactibilidad:borrador";

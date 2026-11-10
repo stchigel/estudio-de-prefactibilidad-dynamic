@@ -33,6 +33,85 @@ const CAMPOS: [string, string][] = [
 
 const FRANJAS = { valle: "Valle", resto: "Resto", pico: "Pico" } as const;
 
+const ETIQUETA_ORIGEN: Record<OrigenConsumo, string> = { factura: "factura", historial: "historial", estimado: "estimado", manual: "manual" };
+
+/** Resumen de la tabla: los mismos datos, totalizados para revisarlos de un vistazo. */
+function ResumenConsumos({ consumos }: { consumos: ConsumoMensual[] }) {
+  const totales = consumos.map((c) => c.valle + c.resto + c.pico);
+  const total = totales.reduce((a, b) => a + b, 0);
+  const conDatos = totales.map((t, i) => ({ t, mes: MESES[i] })).filter((x) => x.t > 0);
+  const mayor = conDatos.reduce<(typeof conDatos)[number] | null>((m, x) => (!m || x.t > m.t ? x : m), null);
+  const menor = conDatos.reduce<(typeof conDatos)[number] | null>((m, x) => (!m || x.t < m.t ? x : m), null);
+  const franjas = (["valle", "resto", "pico"] as const).map((f) => ({ f, kwh: consumos.reduce((a, c) => a + c[f], 0) }));
+  const origenes = (Object.keys(ETIQUETA_ORIGEN) as OrigenConsumo[])
+    .map((o) => ({ o, n: consumos.filter((c) => c.origen === o).length }))
+    .filter((x) => x.n > 0);
+
+  return (
+    <aside aria-label="Resumen anual de consumos" className="rounded-xl border border-borde bg-superficie xl:sticky xl:top-20">
+      <div className="flex min-h-14 items-center border-b border-borde px-5 py-3">
+        <h2 className="text-[15px] font-semibold text-tinta">Resumen anual</h2>
+      </div>
+      <div className="flex flex-col gap-5 p-5 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 xl:grid-cols-1">
+          <div className="col-span-2 xl:col-span-1">
+            <dt className="text-[13px] text-tinta-2">Total anual</dt>
+            <dd className="mt-0.5 text-2xl font-semibold tracking-[-0.01em] text-tinta tabular-nums">
+              {fmt.entero(total)} <span className="text-sm font-normal text-tenue">kWh</span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-tinta-2">Promedio mensual</dt>
+            <dd className="font-medium text-tinta tabular-nums">{conDatos.length ? `${fmt.entero(total / 12)} kWh` : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-tinta-2">Mayor consumo</dt>
+            <dd className="font-medium text-tinta tabular-nums">{mayor ? `${mayor.mes} · ${fmt.entero(mayor.t)} kWh` : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-tinta-2">Menor consumo</dt>
+            <dd className="font-medium text-tinta tabular-nums">{menor ? `${menor.mes} · ${fmt.entero(menor.t)} kWh` : "—"}</dd>
+          </div>
+        </dl>
+
+        <div className="border-t border-borde pt-4">
+          <h3 className="mb-2.5 text-[13px] font-medium text-tinta-2">Por franja</h3>
+          <ul className="flex flex-col gap-2.5">
+            {franjas.map(({ f, kwh }) => {
+              const parte = total > 0 ? kwh / total : 0;
+              return (
+                <li key={f}>
+                  <div className="flex items-baseline justify-between gap-2 tabular-nums">
+                    <span className="text-tinta">{FRANJAS[f]}</span>
+                    <span className="text-tinta-2">
+                      {fmt.entero(kwh)} kWh <span className="ml-1 inline-block w-10 text-right font-medium text-tinta">{fmt.pct(parte)}</span>
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-superficie-2" aria-hidden>
+                    <div className="h-full rounded-full bg-acento transition-[width] duration-200" style={{ width: `${parte * 100}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="border-t border-borde pt-4">
+          <h3 className="mb-2.5 text-[13px] font-medium text-tinta-2">Origen de los datos</h3>
+          <ul className="flex flex-wrap gap-x-3 gap-y-2">
+            {origenes.map(({ o, n }) => (
+              <li key={o} className="flex items-center gap-1.5 text-tinta-2 tabular-nums">
+                <Insignia tono={TONO_ORIGEN[o]}>{ETIQUETA_ORIGEN[o]}</Insignia>
+                {n} {n === 1 ? "mes" : "meses"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function VisorFactura({ archivo }: { archivo: File | undefined }) {
   const url = useMemo(() => (archivo ? URL.createObjectURL(archivo) : null), [archivo]);
   useEffect(() => () => {
@@ -255,7 +334,10 @@ export function PasoConsumos({
       ) : (
         <Aviso nivel="info">Carga manual: completá los consumos mensuales de valle, resto y pico.</Aviso>
       )}
-      {tabla}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        {tabla}
+        <ResumenConsumos consumos={consumos} />
+      </div>
       <BarraAcciones>
         <Boton variante="secundario" onClick={alVolver} icono={<ArrowLeft aria-hidden />}>
           Volver

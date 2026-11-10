@@ -76,6 +76,7 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
   const [entradas, setEntradas] = useState<Entradas>(() => ({ ...entradasIniciales(), ...borrador?.entradas }));
   const [extraccion, setExtraccion] = useState<RespuestaExtraccion | null>(borrador?.extraccion ?? null);
   const [opcionesPpt, setOpcionesPpt] = useState<KitsOpcion[] | null>(borrador?.opcionesPpt ?? null);
+  const [cantidadOpcionesPpt, setCantidadOpcionesPpt] = useState<number | null>(borrador?.cantidadOpcionesPpt ?? null);
   const [archivos, setArchivos] = useState<File[]>([]);
   const [opciones, setOpciones] = useState<OpcionesFormulario | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -88,8 +89,8 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
   }, []);
 
   useEffect(() => {
-    guardarBorrador({ paso, entradas, extraccion, opcionesPpt });
-  }, [paso, entradas, extraccion, opcionesPpt]);
+    guardarBorrador({ paso, entradas, extraccion, opcionesPpt, cantidadOpcionesPpt });
+  }, [paso, entradas, extraccion, opcionesPpt, cantidadOpcionesPpt]);
 
   const actualizar = useCallback((c: Partial<Entradas>) => setEntradas((e) => ({ ...e, ...c })), []);
 
@@ -100,6 +101,7 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
     setEntradas(entradasNuevoAnalisis);
     setExtraccion(null);
     setOpcionesPpt(null);
+    setCantidadOpcionesPpt(null);
     setArchivos([]);
     setPaso("Facturas");
   };
@@ -179,9 +181,10 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
         <PasoOpciones
           e={entradas}
           opciones={opciones}
-          alElegir={(kit1, kit2, tildadas) => {
+          alElegir={(kit1, kit2, tildadas, cantidad) => {
             actualizar({ kit1, kit2 });
             setOpcionesPpt(tildadas);
+            setCantidadOpcionesPpt(cantidad);
             setPaso("Resultados");
           }}
           alVolver={() => setPaso("Proyecto")}
@@ -192,6 +195,7 @@ function Asistente({ alSalir }: { alSalir?: () => void }) {
           e={entradas}
           opciones={opciones}
           opcionesPpt={opcionesPpt}
+          cantidadOpcionesPpt={cantidadOpcionesPpt}
           alCambiar={actualizar}
           alVolver={() => setPaso("Opciones")}
           alNueva={nueva}

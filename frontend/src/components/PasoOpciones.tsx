@@ -34,7 +34,7 @@ export function PasoOpciones({
   e: Entradas;
   opciones: OpcionesFormulario;
   /** `opcionesPpt`: las opciones tildadas para la tabla del PowerPoint (null = todas las de la búsqueda). */
-  alElegir: (kit1: Kit, kit2: Kit | null, opcionesPpt: KitsOpcion[] | null) => void;
+  alElegir: (kit1: Kit, kit2: Kit | null, opcionesPpt: KitsOpcion[] | null, cantidadPpt: number) => void;
   alVolver: () => void;
 }) {
   const [busqueda, setBusqueda] = useState<ResultadoBusqueda | null>(null);
@@ -108,7 +108,7 @@ export function PasoOpciones({
 
   const verResultados = () => {
     const f = filas.find((x) => clave(x.kit1, x.kit2) === elegida);
-    if (f) alElegir(f.kit1, f.kit2, opcionesPpt());
+    if (f) alElegir(f.kit1, f.kit2, opcionesPpt(), filas.filter(enPpt).length);
   };
 
   return (

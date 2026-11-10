@@ -4,7 +4,7 @@ import { Presentation } from "lucide-react";
 import { useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
 import type { DiapositivaPpt, Entradas, KitsOpcion } from "@/lib/tipos";
-import { Aviso, Boton, Seccion } from "./ui";
+import { Aviso, Boton, Insignia, Seccion } from "./ui";
 
 type Imagen = "logo" | "planta" | "montaje";
 
@@ -26,37 +26,47 @@ const TEXTO_CFI_POR_DEFECTO = [
 const claseTexto =
   "w-full rounded-md border border-borde-fuerte bg-superficie px-3 py-2 text-sm leading-5 text-tinta outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-tenue hover:border-eje focus:border-acento focus:ring-3 focus:ring-acento/20";
 
-/** Miniatura genérica de una diapositiva (marcador; no refleja el contenido real). */
+/** Miniatura de la diapositiva tomada de la plantilla (public/diapositivas, ver scripts/exportar-miniaturas.ps1). */
 function Miniatura({ numero, apagada }: { numero: number; apagada: boolean }) {
   return (
-    <span
-      aria-hidden
-      className={`relative flex aspect-video w-28 shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border border-borde bg-plano p-2 transition-opacity duration-150 ${
-        apagada ? "opacity-50 grayscale" : ""
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/diapositivas/${String(numero).padStart(2, "0")}.jpg`}
+      alt=""
+      width={480}
+      height={270}
+      loading="lazy"
+      decoding="async"
+      className={`aspect-video h-auto w-36 shrink-0 self-start rounded-md border border-borde bg-white object-cover transition-[opacity,filter] duration-150 ${
+        apagada ? "opacity-45 grayscale" : ""
       }`}
-    >
-      <span className="h-1.5 w-3/5 rounded-full bg-tinta-2/45" />
-      <span className="flex flex-1 gap-1.5">
-        <span className="flex flex-1 flex-col gap-1 pt-0.5">
-          <span className="h-1 w-full rounded-full bg-eje" />
-          <span className="h-1 w-4/5 rounded-full bg-eje" />
-          <span className="h-1 w-2/3 rounded-full bg-eje" />
-        </span>
-        <span className="w-2/5 rounded-sm bg-acento/25" />
-      </span>
-      <span className="absolute bottom-1 right-1.5 text-[9px] font-medium leading-none text-tenue tabular-nums">{numero}</span>
-    </span>
+    />
   );
+}
+
+/**
+ * Si cada diapositiva condicional puede salir con los datos actuales (misma regla que _condiciones del backend).
+ * Sin condición, o con una que la app no conoce, la diapositiva queda disponible.
+ */
+function disponibles(e: Entradas, cantidadOpcionesPpt: number | null, textoBancario: string): Record<string, boolean> {
+  return {
+    // Sin el dato (borrador anterior a este cambio) no se bloquea: el backend igual la omite si no corresponde.
+    opciones: cantidadOpcionesPpt == null || cantidadOpcionesPpt > 1,
+    financiacion: e.financiacion.porcentaje > 0,
+    bancaria: textoBancario.trim() !== "",
+  };
 }
 
 export function SeccionPresentacion({
   e,
   diapositivas,
   opcionesPpt,
+  cantidadOpcionesPpt,
 }: {
   e: Entradas;
   diapositivas: DiapositivaPpt[];
   opcionesPpt: KitsOpcion[] | null;
+  cantidadOpcionesPpt: number | null;
 }) {
   const [imagenes, setImagenes] = useState<Partial<Record<Imagen, File>>>({});
   const [excluidas, setExcluidas] = useState<Set<number>>(new Set());
@@ -64,6 +74,9 @@ export function SeccionPresentacion({
   const [textoCfi, setTextoCfi] = useState(TEXTO_CFI_POR_DEFECTO);
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const condiciones = disponibles(e, cantidadOpcionesPpt, textoBancario);
+  const disponible = (d: DiapositivaPpt) => !d.condicion || condiciones[d.condicion] !== false;
+  const incluidas = diapositivas.filter((d) => disponible(d) && !excluidas.has(d.numero)).length;
 
   const alternar = (numero: number) =>
     setExcluidas((previas) => {
@@ -78,7 +91,11 @@ export function SeccionPresentacion({
     try {
       await api.exportarPpt(e, {
         opcionesIncluidas: opcionesPpt,
-        diapositivasExcluidas: [...excluidas].sort((a, b) => a - b),
+        // Las no disponibles se mandan como excluidas: el backend también las omitiría.
+        diapositivasExcluidas: diapositivas
+          .filter((d) => excluidas.has(d.numero) || !disponible(d))
+          .map((d) => d.numero)
+          .sort((a, b) => a - b),
         textoBancario,
         textoCfi,
         imagenes,
@@ -120,7 +137,7 @@ export function SeccionPresentacion({
           <span aria-hidden>
             Páginas de la presentación
             <span className="ml-2 font-normal text-tenue tabular-nums">
-              {diapositivas.length - excluidas.size} de {diapositivas.length}
+              {incluidas} de {diapositivas.filter(disponible).length}
             </span>
           </span>
           <span className="flex gap-3 text-xs font-normal">
@@ -138,24 +155,38 @@ export function SeccionPresentacion({
         </div>
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {diapositivas.map((d) => {
-            const incluida = !excluidas.has(d.numero);
+            const habilitada = disponible(d);
+            const incluida = habilitada && !excluidas.has(d.numero);
             return (
               <li key={d.numero}>
                 <label
-                  className={`relative flex h-full cursor-pointer gap-3 rounded-lg border p-2.5 transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-acento ${
-                    incluida ? "border-borde-fuerte bg-superficie hover:border-acento/60" : "border-borde bg-superficie-2/60 hover:border-borde-fuerte"
+                  title={habilitada ? undefined : d.nota}
+                  className={`relative flex h-full gap-3 rounded-lg border p-2.5 transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-acento ${
+                    !habilitada
+                      ? "cursor-not-allowed border-dashed border-borde bg-superficie-2/40"
+                      : incluida
+                        ? "cursor-pointer border-borde-fuerte bg-superficie hover:border-acento/60"
+                        : "cursor-pointer border-borde bg-superficie-2/60 hover:border-borde-fuerte"
                   }`}
                 >
                   <Miniatura numero={d.numero} apagada={!incluida} />
                   <span className="flex min-w-0 flex-1 flex-col py-0.5 pr-6">
                     <span className="text-xs text-tenue tabular-nums">Diapositiva {d.numero}</span>
                     <span className={`text-sm font-medium leading-5 ${incluida ? "text-tinta" : "text-tenue"}`}>{d.titulo}</span>
-                    {d.nota && <span className="mt-0.5 text-xs leading-4 text-tenue">{d.nota}</span>}
+                    {d.nota && (
+                      <span className={`mt-0.5 text-xs leading-4 ${habilitada ? "text-tenue" : "text-advertencia-texto"}`}>{d.nota}</span>
+                    )}
+                    {!habilitada && (
+                      <span className="mt-1.5">
+                        <Insignia tono="neutro">No disponible</Insignia>
+                      </span>
+                    )}
                   </span>
                   <input
                     type="checkbox"
                     className="absolute right-2.5 top-2.5"
                     checked={incluida}
+                    disabled={!habilitada}
                     onChange={() => alternar(d.numero)}
                   />
                 </label>

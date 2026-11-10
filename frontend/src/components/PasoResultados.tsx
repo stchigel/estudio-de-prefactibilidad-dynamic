@@ -29,6 +29,7 @@ export function PasoResultados({
   e,
   opciones,
   opcionesPpt,
+  cantidadOpcionesPpt,
   alCambiar,
   alVolver,
   alNueva,
@@ -36,6 +37,7 @@ export function PasoResultados({
   e: Entradas;
   opciones: OpcionesFormulario;
   opcionesPpt: KitsOpcion[] | null;
+  cantidadOpcionesPpt: number | null;
   alCambiar: (c: Partial<Entradas>) => void;
   alVolver: () => void;
   alNueva: () => void;
@@ -195,7 +197,12 @@ export function PasoResultados({
             </Seccion>
           </div>
 
-          <SeccionPresentacion e={e} diapositivas={opciones.diapositivas} opcionesPpt={opcionesPpt} />
+          <SeccionPresentacion
+            e={e}
+            diapositivas={opciones.diapositivas}
+            opcionesPpt={opcionesPpt}
+            cantidadOpcionesPpt={cantidadOpcionesPpt}
+          />
         </>
       )}
 
