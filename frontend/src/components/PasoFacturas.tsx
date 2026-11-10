@@ -1,8 +1,9 @@
 "use client";
 
-import { FileText, ImageIcon, Upload, X } from "lucide-react";
+import { FileText, FlaskConical, ImageIcon, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { api, ErrorApi } from "@/lib/api";
+import { extraccionDePrueba } from "@/lib/datosDePrueba";
 import type { RespuestaExtraccion } from "@/lib/tipos";
 import { Aviso, BarraAcciones, Boton, Seccion } from "./ui";
 
@@ -133,9 +134,21 @@ export function PasoFacturas({
 
       <div className="flex-1" />
       <BarraAcciones>
-        <Boton variante="fantasma" onClick={alSaltear}>
-          Cargar consumos a mano
-        </Boton>
+        <div className="flex flex-wrap items-center gap-2">
+          <Boton variante="fantasma" onClick={alSaltear}>
+            Cargar consumos a mano
+          </Boton>
+          {/* TEMPORAL, solo para pruebas: salta la IA con datos inventados (ver lib/datosDePrueba.ts). */}
+          <Boton
+            variante="fantasma"
+            onClick={() => alExtraer(extraccionDePrueba(archivos))}
+            deshabilitado={cargando}
+            icono={<FlaskConical aria-hidden />}
+            titulo="Salta la lectura con IA y carga datos ficticios. Solo para pruebas."
+          >
+            Datos de prueba (sin IA)
+          </Boton>
+        </div>
         <Boton onClick={extraer} deshabilitado={!archivos.length} cargando={cargando}>
           {cargando ? "Leyendo facturas…" : "Extraer datos"}
         </Boton>
