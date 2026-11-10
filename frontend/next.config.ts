@@ -25,11 +25,12 @@ const nextConfig: NextConfig = {
         async rewrites() {
           return [{ source: "/api/:ruta*", destination: `${BACKEND_URL}/api/:ruta*` }];
         },
-        experimental: {
-          // La lectura de facturas con IA puede tardar más que los 30 s por defecto del reenvío.
-          proxyTimeout: 300_000,
-        },
       }),
+  experimental: {
+    agentUpgrade: "security",
+    // La lectura de facturas con IA puede tardar más que los 30 s por defecto del reenvío (solo modo normal).
+    ...(ESTATICO ? {} : { proxyTimeout: 300_000 }),
+  },
   turbopack: {
     rules: {
       "*.css": {
