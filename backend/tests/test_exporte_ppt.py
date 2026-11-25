@@ -114,7 +114,7 @@ def test_graficos_nativos(simple):
     barras, linea = plots[0].series, plots[1].series
     assert list(barras[0].values) == pytest.approx(r.financiacion.pagos_semestrales)
     assert list(barras[1].values) == pytest.approx(r.financiacion.ahorros_semestrales)
-    assert list(linea[0].values) == pytest.approx(r.financiacion.ahorro_acumulado_semestral)
+    assert list(linea[0].values) == pytest.approx(r.financiacion.ahorro_neto_acumulado_semestral)
     assert len(barras[0].values) == 14 and len(plots) == 2
 
 

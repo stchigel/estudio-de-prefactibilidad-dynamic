@@ -32,7 +32,7 @@ CONDICION = re.compile(r"^\[\[si:(\w+)\]\]")
 ANIOS_VIDA_UTIL = 25
 FILAS_OPCIONES_PLANTILLA = 6  # filas de datos que entran con el tamaño original
 ALTO_DISPONIBLE_FILAS = 2_350_000  # EMU entre el encabezado de la tabla y la nota al pie
-COLOR_AHORRO_ACUMULADO = "2B231E"  # tinta de la plantilla: la línea se distingue de las barras
+COLOR_AHORRO_NETO = "2B231E"  # tinta de la plantilla: la línea se distingue de las barras
 RESALTADO_RECOMENDADA = RGBColor(0xFD, 0xE4, 0xE4)  # rojo muy claro, acorde a la marca
 # Párrafos condicionales que se vacían en lugar de quitarse, para no desalinear íconos.
 VACIAR_EN_LUGAR_DE_QUITAR = {"capacitores"}
@@ -480,9 +480,9 @@ def _grafico_financiacion(slide, d: DatosPpt) -> None:
     datos.categories = [f"S{i}" for i in range(1, len(fin.pagos_semestrales) + 1)]  # semestres
     datos.add_series(f"Pagos en {moneda}", fin.pagos_semestrales)
     datos.add_series(f"Ahorros en {moneda}", fin.ahorros_semestrales)
-    datos.add_series(f"Ahorro acumulado en {moneda}", fin.ahorro_acumulado_semestral)
+    datos.add_series(f"Ahorro neto acumulado en {moneda}", fin.ahorro_neto_acumulado_semestral)
     f.chart.replace_data(datos)
-    _serie_a_linea(f.chart, indice=2, color=COLOR_AHORRO_ACUMULADO)
+    _serie_a_linea(f.chart, indice=2, color=COLOR_AHORRO_NETO)
 
 
 def _serie_a_linea(grafico, indice: int, color: str) -> None:

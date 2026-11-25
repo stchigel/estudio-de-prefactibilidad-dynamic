@@ -356,9 +356,10 @@ def _financiacion(e: Entradas, inversion: float, ahorro_usd: float) -> Resultado
         mitad = pago(anio) / 2
         pagos_sem += [mitad + (propio if anio == 1 else 0.0), mitad]
     ahorros_sem = [ahorro_usd / 2] * (2 * ANIOS_FINANCIACION)
+    # Ahorro neto acumulado: lo que se ahorró menos lo que se pagó, hasta cada semestre.
     acumulado, total = [], 0.0
-    for a in ahorros_sem:
-        total += a
+    for a, p in zip(ahorros_sem, pagos_sem):
+        total += a - p
         acumulado.append(total)
     return ResultadoFinanciacion(
         monto_financiado=financiado,
@@ -367,7 +368,7 @@ def _financiacion(e: Entradas, inversion: float, ahorro_usd: float) -> Resultado
         ahorros=[ahorro_usd] * ANIOS_FINANCIACION,
         pagos_semestrales=pagos_sem,
         ahorros_semestrales=ahorros_sem,
-        ahorro_acumulado_semestral=acumulado,
+        ahorro_neto_acumulado_semestral=acumulado,
     )
 
 

@@ -114,15 +114,15 @@ export function GraficoRoi({ r }: { r: Resultado }) {
 
 export function GraficoFinanciacion({ r }: { r: Resultado }) {
   const f = r.financiacion;
-  // Por semestre: pagos y ahorros en barras, ahorro acumulado en línea.
+  // Por semestre: pagos y ahorros en barras, ahorro neto acumulado en línea.
   const datos = f.pagos_semestrales.map((p, i) => ({
     semestre: `S${i + 1}`,
     Pagos: p,
     Ahorros: f.ahorros_semestrales[i],
-    "Ahorro acumulado": f.ahorro_acumulado_semestral[i],
+    "Ahorro neto acumulado": f.ahorro_neto_acumulado_semestral[i],
   }));
   return (
-    <Marco titulo="Financiamiento: pagos vs. ahorros" descripcion="U$D por semestre, primeros 7 años · el ahorro acumulado va en línea">
+    <Marco titulo="Financiamiento: pagos vs. ahorros" descripcion="U$D por semestre, primeros 7 años · el ahorro neto (ahorros − pagos) acumulado va en línea">
       <ResponsiveContainer>
         <ComposedChart data={datos} barGap={2} barCategoryGap="25%">
           {GRILLA}
@@ -132,7 +132,7 @@ export function GraficoFinanciacion({ r }: { r: Resultado }) {
           <Legend {...LEYENDA} />
           <Bar dataKey="Pagos" fill="var(--serie-1)" radius={[4, 4, 0, 0]} maxBarSize={20} />
           <Bar dataKey="Ahorros" fill="var(--serie-2)" radius={[4, 4, 0, 0]} maxBarSize={20} />
-          <Line dataKey="Ahorro acumulado" stroke="var(--tinta)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          <Line dataKey="Ahorro neto acumulado" stroke="var(--tinta)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </Marco>

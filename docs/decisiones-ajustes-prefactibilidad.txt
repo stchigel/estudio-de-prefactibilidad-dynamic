@@ -153,8 +153,8 @@ HECHO
    - Consecuencia: la lista puede tener hasta 9-10 filas (5 tamaños x 2). La tabla del PPT achica filas y letra (10 pt) cuando hay más de 6 para no pisar el pie de página.
    - En el PPT, si dos filas tienen la misma potencia, la celda de potencia agrega los kits entre paréntesis, p. ej. "110,2 (2x55,68)".
 
-6) Ahorro acumulado en el gráfico "Financiamiento: pagos vs. ahorros"
-   - Línea (no barra) de ahorro acumulado sobre las barras de pagos y ahorros. En la web (Recharts) y en el PPT (gráfico nativo combinado barras + línea).
+6) Ahorro neto acumulado en el gráfico "Financiamiento: pagos vs. ahorros"
+   - Línea (no barra) de ahorro neto acumulado (Σ ahorros − Σ pagos, arranca negativo por el anticipo) sobre las barras de pagos y ahorros. En la web (Recharts) y en el PPT (gráfico nativo combinado barras + línea).
 
 7) Gráfico semestral
    - 14 semestres (7 años). Pagos: la cuota o los intereses de cada año se reparten mitad y mitad entre sus dos semestres; el anticipo cae en el semestre 1. Ahorro: la mitad del anual por semestre.

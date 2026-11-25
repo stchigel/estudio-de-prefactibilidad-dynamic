@@ -127,7 +127,7 @@ export interface Resultado {
     ahorros: number[];
     pagos_semestrales: number[];
     ahorros_semestrales: number[];
-    ahorro_acumulado_semestral: number[];
+    ahorro_neto_acumulado_semestral: number[];
   };
   huella: { tco2_anio: number; tco2_25_anios: number; arboles: number; autos: number };
   capacidad_bateria_recomendada_kwh: number;
