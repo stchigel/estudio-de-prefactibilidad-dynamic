@@ -333,6 +333,7 @@ Se recomienda aplicar también #2 en la planilla para que el Excel exportado coi
    - generen excedente inyectado desproporcionado con inhibición = SI (umbral configurable).
 3. Calcular cada combinación con el motor completo.
 4. Ordenar por **ROI** (menor = mejor). Desempate: mayor cobertura cuando la diferencia de ROI < 0,2 años (configurable).
+   - **Prioridad a un solo inversor**: si la recomendada tiene varios inversores, se recomienda en su lugar el sistema de un solo inversor más chico que alcance su potencia (mismo tamaño o el siguiente válido), sin importar la diferencia de ROI (1 × 110 kWp antes que 2 × 55 kWp). La de mejor ROI desplazada se presenta igual como otra opción.
 5. Presentar la **recomendada** (mejor ROI) más **2 tamaños más chicos y 2 más grandes** en potencia (separados al menos 15 % entre sí; si de un lado no alcanzan, se completan con el otro). Combinaciones de potencia similar (±5 %) son el mismo tamaño: si la segunda tiene ROI a menos de 0,2 años de la mejor, se muestran **las dos** (p. ej. 2 × 55 kWp y 1 × 110 kWp).
 6. Los kits armados a mano se **agregan a la tabla** (no reemplazan la búsqueda) y se pueden elegir como la preferida. Cada opción tiene un tilde «En el PPT»; las destildadas se ven atenuadas: las tildadas forman la tabla de opciones de la presentación (la elegida va siempre). El usuario puede **elegir otra manualmente** o editar una opción. La opción elegida alimenta las diapositivas de "los números", ROI y financiación.
 

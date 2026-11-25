@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 from casos.definiciones import plecor
-from motor.opciones import Candidata, ConfigBusqueda, _ordenar, _seleccionar, buscar_opciones, combinaciones
+from motor.opciones import Candidata, ConfigBusqueda, _ordenar, _seleccionar, _seleccionar_priorizando_sistema_unico, buscar_opciones, combinaciones
 from motor import catalogo_vigente
 from motor.modelos import Kit
 
@@ -98,3 +98,56 @@ def test_si_la_segunda_combinacion_tiene_peor_roi_no_se_muestra():
     a, b = _c(111.36, 4.0, n=2), _c(110.2, 4.6)
     elegidas = _seleccionar(_ordenar([a, b], 0.2), ConfigBusqueda())
     assert elegidas == [a]
+
+
+# ----------------------------------------------- prioridad a los sistemas de un solo inversor
+
+
+def _elegir(candidatas):
+    return _seleccionar_priorizando_sistema_unico(_ordenar(candidatas, 0.2), ConfigBusqueda())
+
+
+def test_un_inversor_gana_a_dos_aunque_el_roi_sea_peor():
+    """1 x 110,2 antes que 2 x 55,68 aun con ROI bastante peor; la de dos inversores también se muestra."""
+    dos_de_55 = _c(111.36, 3.5, cob=0.40, n=2)
+    una_de_110 = _c(110.2, 4.6, cob=0.39)
+    otras = [_c(k, 5.0) for k in (60, 85, 140, 170)]
+    ranking, elegidas = _elegir([dos_de_55, una_de_110, *otras])
+    assert ranking[0] is una_de_110
+    assert dos_de_55 in elegidas and una_de_110 in elegidas
+
+
+def test_si_el_tamano_igual_no_tiene_un_inversor_sube_al_unico_mayor_que_entra():
+    """2 x 22 (44 kWp) y no hay 1 x 44: se prefiere el de 55 si es válido."""
+    dos_de_22 = _c(44.0, 3.5, n=2)
+    una_de_55 = _c(55.68, 4.4)
+    una_de_88 = _c(88.16, 4.8)
+    ranking, elegidas = _elegir([dos_de_22, una_de_55, una_de_88])
+    assert ranking[0] is una_de_55
+    assert dos_de_22 in elegidas
+
+
+def test_si_ningun_un_inversor_alcanza_se_mantiene_la_de_varios():
+    dos_de_55 = _c(111.36, 3.5, n=2)
+    una_chica = _c(55.68, 3.6)  # un solo inversor, pero más chica que la recomendada
+    ranking, _ = _elegir([dos_de_55, una_chica])
+    assert ranking[0] is dos_de_55
+
+
+def test_dos_kits_distintos_cuentan_como_dos_inversores():
+    mixta = Candidata(Kit(88.16), Kit(22.04), 110.2, 0.4, 0, 0, 0, 0, 3.5)
+    una_de_110 = _c(110.2, 4.2)
+    ranking, elegidas = _elegir([mixta, una_de_110])
+    assert ranking[0] is una_de_110 and mixta in elegidas
+
+
+def test_si_la_recomendada_ya_es_de_un_inversor_no_cambia():
+    una, dos = _c(110.2, 3.5), _c(111.36, 4.5, n=2)
+    ranking, elegidas = _elegir([una, dos])
+    assert ranking[0] is una and elegidas == [una]
+
+
+def test_la_recomendada_de_la_busqueda_es_de_un_solo_inversor():
+    r = buscar_opciones(plecor())
+    rec = next(o for o in r.opciones if o.recomendada)
+    assert rec.kit2 is None and rec.kit1.cantidad == 1

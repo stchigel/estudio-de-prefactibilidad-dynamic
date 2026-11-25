@@ -184,6 +184,38 @@ def _seleccionar(ranking: list[Candidata], cfg: ConfigBusqueda) -> list[Candidat
     return seleccion
 
 
+def _inversores(c: Candidata) -> int:
+    """Un inversor por kit: la cantidad de kits de la combinación."""
+    return c.kit1.cantidad + (c.kit2.cantidad if c.kit2 else 0)
+
+
+def _priorizar_sistema_unico(ranking: list[Candidata], cfg: ConfigBusqueda) -> list[Candidata]:
+    """Si la recomendada tiene varios inversores, pasa al frente el sistema de un solo inversor
+    más chico que alcance su potencia (el mismo tamaño o el siguiente, si es válido), sin
+    importar la diferencia de ROI: 1 × 110 kWp antes que 2 × 55 kWp. Si no hay, no cambia nada."""
+    if not ranking or _inversores(ranking[0]) == 1:
+        return ranking
+    piso = ranking[0].kwp * (1 - cfg.tolerancia_tamano)
+    unicos = [c for c in ranking if _inversores(c) == 1 and c.kwp >= piso]
+    if not unicos:
+        return ranking
+    elegida = min(unicos, key=lambda c: (c.kwp, c.roi_anios, -c.cobertura))
+    return [elegida] + [c for c in ranking if c is not elegida]
+
+
+def _seleccionar_priorizando_sistema_unico(ranking: list[Candidata], cfg: ConfigBusqueda) -> tuple[list[Candidata], list[Candidata]]:
+    """(ranking con la recomendada primero, opciones a presentar). La de mejor ROI que se
+    desplazó por tener varios inversores se presenta igual, como una opción más."""
+    if not ranking:
+        return [], []
+    mejor_roi = ranking[0]
+    ranking = _priorizar_sistema_unico(ranking, cfg)
+    elegidas = _seleccionar(ranking, cfg)
+    if mejor_roi not in elegidas:
+        elegidas.append(mejor_roi)
+    return ranking, elegidas
+
+
 def buscar_opciones(
     e: Entradas,
     config: ConfigBusqueda | None = None,
@@ -223,7 +255,7 @@ def buscar_opciones(
     sin_control_potencia = _ordenar(sin_control_potencia, cfg.tolerancia_roi_anios)
     limitado = bool(validas and sin_control_potencia) and sin_control_potencia[0].kwp > e.potencia_contratada_kw > 0
 
-    elegidas = _seleccionar(validas, cfg)
+    validas, elegidas = _seleccionar_priorizando_sistema_unico(validas, cfg)
     opciones = [
         Opcion(c.kit1, c.kit2, recomendada=(c is validas[0]), resultado=calcular(replace(e, kit1=c.kit1, kit2=c.kit2), cat, par))
         for c in elegidas
