@@ -13,8 +13,8 @@ const nextConfig: NextConfig = {
   ...(ESTATICO
     ? {
         output: "export",
-        // Carpeta propia para no pisar el `.next` del modo normal.
-        distDir: ".next-export",
+        // Con `output: "export"`, Next escribe el sitio en distDir: va a `out/` y no pisa el `.next` del modo normal.
+        distDir: "out",
       }
     : {
         cacheComponents: true,

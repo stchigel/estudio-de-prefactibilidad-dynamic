@@ -9,7 +9,6 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
-    ".next-export/**", // compilación estática (npm run build:estatico)
     "out/**",
     "build/**",
     "next-env.d.ts",

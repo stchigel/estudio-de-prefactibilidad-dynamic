@@ -23,9 +23,11 @@ const TOOLTIP = {
   contentStyle: {
     background: "var(--superficie)",
     border: "1px solid var(--borde)",
-    borderRadius: 6,
+    borderRadius: 8,
     color: "var(--tinta)",
     fontSize: 13,
+    boxShadow: "0 4px 12px rgb(0 0 0 / 0.12)",
+    padding: "8px 10px",
   },
   labelStyle: { color: "var(--tinta)", fontWeight: 600 },
   itemStyle: { color: "var(--tinta-2)" },
@@ -43,12 +45,12 @@ const miles = (v: number) => (Math.abs(v) >= 1000 ? `${fmt.n(v / 1000)} k` : fmt
 
 function Marco({ titulo, descripcion, children }: { titulo: string; descripcion: string; children: React.ReactNode }) {
   return (
-    <figure className="rounded-lg border border-borde bg-superficie p-5">
-      <figcaption className="mb-3">
-        <p className="text-sm font-semibold text-tinta">{titulo}</p>
-        <p className="text-xs text-tenue">{descripcion}</p>
+    <figure className="flex flex-col rounded-xl border border-borde bg-superficie">
+      <figcaption className="flex min-h-14 flex-col justify-center border-b border-borde px-5 py-2.5">
+        <span className="text-[15px] font-semibold text-tinta">{titulo}</span>
+        <span className="text-xs text-tenue">{descripcion}</span>
       </figcaption>
-      <div className="h-64">{children}</div>
+      <div className="h-72 px-3 pb-3 pt-4">{children}</div>
     </figure>
   );
 }

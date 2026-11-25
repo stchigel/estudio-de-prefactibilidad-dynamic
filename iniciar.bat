@@ -1,5 +1,6 @@
 @echo off
 rem Inicia backend y frontend, cada uno en su ventana, y abre el navegador.
+rem La primera vez instala todo; si faltan Python o Node.js, ofrece instalarlos con winget.
 rem   iniciar.bat              modo uso normal (compila el frontend y lo sirve optimizado)
 rem   iniciar.bat desarrollo   recarga automática al editar código (lo usa iniciar-desarrollo.bat)
 chcp 65001 >nul
@@ -72,23 +73,77 @@ netstat -ano | findstr /r /c:":%1 .*LISTENING" /c:":%1 .*ESCUCHANDO" >nul
 exit /b %errorlevel%
 
 :instalar_si_falta
-if not exist "backend\.venv\Scripts\python.exe" (
-    echo Primera vez: instalando el backend...
-    where python >nul 2>nul || ( echo Falta Python 3.12 o superior: https://www.python.org/downloads/ & exit /b 1 )
-    python -m venv backend\.venv || exit /b 1
-    pushd backend
-    .venv\Scripts\python -m pip install -e ".[dev]"
-    if errorlevel 1 ( popd & exit /b 1 )
-    popd
-)
-if not exist "frontend\node_modules" (
-    echo Primera vez: instalando el frontend...
-    where npm >nul 2>nul || ( echo Falta Node.js 20 o superior: https://nodejs.org/ & exit /b 1 )
-    pushd frontend
-    call npm install
-    if errorlevel 1 ( popd & exit /b 1 )
-    popd
-)
+if exist "backend\.venv\Scripts\python.exe" goto :frontend_si_falta
+call :buscar_python || exit /b 1
+echo Primera vez: instalando el backend...
+"%PY%" -m venv backend\.venv || exit /b 1
+pushd backend
+.venv\Scripts\python -m pip install -e ".[dev]"
+if errorlevel 1 ( popd & exit /b 1 )
+popd
+
+:frontend_si_falta
+if exist "frontend\node_modules" exit /b 0
+call :buscar_node || exit /b 1
+echo Primera vez: instalando el frontend...
+pushd frontend
+call npm install
+if errorlevel 1 ( popd & exit /b 1 )
+popd
+exit /b 0
+
+
+rem Deja en PY un Python 3.12 o superior; si no hay, ofrece instalarlo con winget.
+rem (El "python" de Microsoft Store que aparece sin Python instalado falla en la prueba y no cuenta.)
+:buscar_python
+set "PY=python"
+call :python_sirve && exit /b 0
+for %%v in (312 313 314) do if exist "%LOCALAPPDATA%\Programs\Python\Python%%v\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python%%v\python.exe"
+call :python_sirve && exit /b 0
+echo.
+echo Falta Python 3.12 o superior.
+call :ofrecer_instalar Python || goto :python_manual
+winget install -e --id Python.Python.3.13 --accept-package-agreements --accept-source-agreements --override "/quiet InstallAllUsers=0 InstallLauncherAllUsers=0 PrependPath=1"
+set "PY=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+call :python_sirve && exit /b 0
+echo No se pudo instalar Python automaticamente.
+:python_manual
+echo Instalarlo desde https://www.python.org/downloads/ tildando "Add python.exe to PATH",
+echo y volver a ejecutar este archivo.
+exit /b 1
+
+:python_sirve
+"%PY%" -c "import sys; sys.exit(sys.version_info < (3, 12))" >nul 2>nul
+exit /b %errorlevel%
+
+
+rem Deja Node.js 20 o superior en el PATH; si no hay, ofrece instalarlo con winget.
+:buscar_node
+call :node_sirve && exit /b 0
+set "PATH=%ProgramFiles%\nodejs;%PATH%"
+call :node_sirve && exit /b 0
+echo.
+echo Falta Node.js 20 o superior.
+call :ofrecer_instalar Node.js || goto :node_manual
+echo Windows va a pedir permiso de administrador para instalarlo.
+winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+call :node_sirve && exit /b 0
+echo No se pudo instalar Node.js automaticamente.
+:node_manual
+echo Instalarlo desde https://nodejs.org/ (version LTS) y volver a ejecutar este archivo.
+exit /b 1
+
+:node_sirve
+node -e "process.exit(Number(process.versions.node.split('.')[0]) < 20 ? 1 : 0)" >nul 2>nul || exit /b 1
+where npm >nul 2>nul
+exit /b %errorlevel%
+
+
+rem Pregunta antes de instalar (winget viene con Windows 10/11 actualizados).
+:ofrecer_instalar
+where winget >nul 2>nul || exit /b 1
+choice /c SN /m "Instalar %~1 ahora automaticamente"
+if errorlevel 2 exit /b 1
 exit /b 0
 
 rem Espera hasta 3 minutos a que la URL responda (el primer arranque en desarrollo es lento).

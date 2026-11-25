@@ -12,6 +12,9 @@ Especificación: [docs/especificacion.md](docs/especificacion.md) · pendientes 
 
 - Python 3.12 o superior
 - Node.js 20 o superior (probado con 24 LTS)
+
+  En Windows, si faltan, `iniciar.bat` ofrece instalarlos solo con winget (Python 3.13 y Node.js LTS;
+  Node pide permiso de administrador). Sin winget, muestra de dónde descargarlos.
 - Opcional: API key de Gemini (Google) o de Claude (Anthropic) para leer facturas automáticamente
 
 ## Primer paso: configurar la API key (Windows)
@@ -37,7 +40,8 @@ Doble clic en el script de la carpeta del repositorio:
 | `iniciar-desarrollo.bat` | Para trabajar en el código: recarga automática al guardar cambios |
 | `detener.bat` | Apaga los dos servidores (también alcanza con cerrar sus ventanas) |
 
-La primera vez los scripts instalan solos las dependencias si faltan. Después de actualizar
+La primera vez los scripts instalan solos las dependencias si faltan (y, si no están, ofrecen instalar
+Python y Node.js). Después de actualizar
 el código con dependencias nuevas, correr los comandos de "Primera vez".
 
 ## Primera vez

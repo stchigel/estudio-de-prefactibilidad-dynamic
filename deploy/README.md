@@ -52,6 +52,8 @@ Queda el sitio en `frontend/out/`. Subir **el contenido** de esa carpeta (compri
 *Administrador de archivos*) a la carpeta raíz del subdominio `app`. Activar en cPanel *Forzar redireccionamiento
 HTTPS* para ese dominio.
 
+- `out/` incluye un `.htaccess` (archivo oculto) para que, después de actualizar, el navegador no siga mostrando la
+  versión vieja. Subirlo también; en el *Administrador de archivos* se ve activando "Mostrar archivos ocultos".
 - La URL de la API queda escrita en los archivos al compilar: si cambia, hay que compilar y subir de nuevo.
 - Publicarlo en una subcarpeta (`tuempresa.com/prefactibilidad`) no está soportado; usar un subdominio.
 
