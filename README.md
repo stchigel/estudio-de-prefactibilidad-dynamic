@@ -39,6 +39,7 @@ Doble clic en el script de la carpeta del repositorio:
 | `iniciar.bat` | Uso normal. Compila el frontend y abre backend y frontend en dos ventanas; al terminar abre el navegador y muestra la dirección para otras PCs (Tailscale) |
 | `iniciar-desarrollo.bat` | Para trabajar en el código: recarga automática al guardar cambios |
 | `detener.bat` | Apaga los dos servidores (también alcanza con cerrar sus ventanas) |
+| `crear-zip.bat` | Arma `<carpeta>.zip` al lado del repositorio para llevar el sistema a otra PC: el código y `backend/.env` (con la API key), sin lo que instala `iniciar.bat`. Compartirlo solo por un medio privado |
 
 La primera vez los scripts instalan solos las dependencias si faltan (y, si no están, ofrecen instalar
 Python y Node.js). Después de actualizar
