@@ -27,7 +27,7 @@ from exportes.excel import exportar_excel
 from exportes.powerpoint import DIAPOSITIVA_OPCIONES, DIAPOSITIVAS, DatosPpt, OpcionPpt, generar_ppt
 from extraccion.derivados import sugerir
 from extraccion.esquema import FacturaExtraida
-from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_factura
+from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_facturas
 from motor import calcular, catalogo_vigente, parametros_vigentes
 from motor.consumos import LecturaMensual, consolidar
 from motor.modelos import (
@@ -249,7 +249,10 @@ TAMANIO_MAXIMO_FACTURA = 30 * 1024 * 1024  # límite de la API de Claude: 32 MB 
 
 @app.post("/api/facturas/extraer")
 async def extraer_facturas(request: Request, archivos: list[UploadFile]) -> dict[str, Any]:
-    """Extrae cada factura (§5.2) y devuelve los datos sugeridos para el formulario (§5.3–5.4)."""
+    """Extrae las facturas (§5.2) y devuelve los datos sugeridos para el formulario (§5.3–5.4).
+
+    Un archivo puede traer varias facturas (p. ej. un PDF con los 12 meses): cada una es una entrada.
+    """
     acceso.limitar_facturas(request, len(archivos))  # cada factura gasta crédito de la API de IA
     extraidas = []
     for archivo in archivos:
@@ -257,14 +260,14 @@ async def extraer_facturas(request: Request, archivos: list[UploadFile]) -> dict
         if len(contenido) > TAMANIO_MAXIMO_FACTURA:
             raise HTTPException(413, f"{archivo.filename}: supera 30 MB")
         try:
-            factura = await run_in_threadpool(extraer_factura, contenido, archivo.content_type or "")
+            del_archivo = await run_in_threadpool(extraer_facturas, contenido, archivo.content_type or "")
         except ExtraccionNoConfigurada as exc:
             raise HTTPException(503, str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(415, f"{archivo.filename}: {exc}") from exc
         except ExtraccionFallida as exc:
             raise HTTPException(502, f"{archivo.filename}: {exc}") from exc
-        extraidas.append({"archivo": archivo.filename, "datos": factura.model_dump(mode="json")})
+        extraidas += [{"archivo": archivo.filename, "datos": f.model_dump(mode="json")} for f in del_archivo]
     sugerencias = sugerir([FacturaExtraida.model_validate(e["datos"]) for e in extraidas])
     return {"facturas": extraidas, "sugerencias": a_dict(sugerencias)}
 

@@ -17,7 +17,7 @@ import base64
 import logging
 import os
 
-from .esquema import FacturaExtraida
+from .esquema import FacturaExtraida, FacturasExtraidas
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,14 @@ TIPO_PDF = "application/pdf"
 
 INSTRUCCIONES = """\
 Sos un analista de Dynamic Energy que lee facturas de energía eléctrica argentinas \
-para estudios de prefactibilidad solar. Extraé los datos de la factura adjunta.
+para estudios de prefactibilidad solar. Extraé los datos de las facturas del documento adjunto.
 
-Criterios:
+El documento puede tener una sola factura o varias (por ejemplo, los 12 meses de un año \
+en un mismo PDF). Devolvé una entrada por cada factura distinta, en el orden en que aparecen. \
+Cada factura puede ocupar varias páginas: no la partas ni la repitas, y no mezcles datos de \
+una factura con los de otra. Si ves la misma factura dos veces, devolvela una sola vez.
+
+Criterios (valen para cada factura):
 - Copiá los números tal como figuran, convertidos a número (formato argentino: \
 "12.960.728,37" = 12960728.37). No inventes datos: si un campo no figura, valor null \
 y confianza 1. Usá confianza baja cuando el dato está borroso, cortado o lo inferiste.
@@ -69,7 +74,11 @@ estimá cada barra con la escala del eje, marcá leido_de_grafico=true y confian
 - tipo_documento: factura de distribuidora, de CAMMESA, de generadora (contratos \
 MAT/GUME) u otro documento.
 """
-PEDIDO = "Extraé los datos de esta factura."
+PEDIDO = "Extraé los datos de las facturas de este documento."
+
+# Un PDF con un año de facturas da un JSON largo: más que el tope de 16000 de la API sin streaming.
+MAX_TOKENS_CLAUDE = 32000
+TIMEOUT_CLAUDE_S = 600  # con timeout explícito el SDK permite max_tokens altos sin streaming
 
 
 class ExtraccionNoConfigurada(RuntimeError):
@@ -85,25 +94,28 @@ def _validar_tipo(media_type: str) -> None:
         raise ValueError(f"Tipo de archivo no soportado: {media_type}. Usar PDF, JPG o PNG.")
 
 
-def extraer_factura(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
-    """Extrae los datos de una factura con el proveedor configurado.
+def extraer_facturas(contenido: bytes, media_type: str, cliente=None) -> list[FacturaExtraida]:
+    """Extrae las facturas de un documento (una o varias) con el proveedor configurado.
 
     `cliente` permite inyectar el cliente del SDK (tests).
     """
     _validar_tipo(media_type)
     match proveedor():
         case "gemini":
-            return _extraer_con_gemini(contenido, media_type, cliente)
+            extraidas = _extraer_con_gemini(contenido, media_type, cliente)
         case "claude":
-            return _extraer_con_claude(contenido, media_type, cliente)
+            extraidas = _extraer_con_claude(contenido, media_type, cliente)
         case otro:
             raise ExtraccionNoConfigurada(f"EXTRACCION_PROVEEDOR desconocido: {otro!r} (usar 'gemini' o 'claude')")
+    if not extraidas.facturas:
+        raise ExtraccionFallida("No se encontró ninguna factura en el documento")
+    return extraidas.facturas
 
 
 # ------------------------------------------------------------------ Gemini
 
 
-def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
+def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> FacturasExtraidas:
     from google import genai
     from google.genai import errors, types
 
@@ -132,7 +144,7 @@ def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> Fact
                 config=types.GenerateContentConfig(
                     system_instruction=INSTRUCCIONES,
                     response_mime_type="application/json",
-                    response_json_schema=FacturaExtraida.model_json_schema(),
+                    response_json_schema=FacturasExtraidas.model_json_schema(),
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),  # no usa herramientas
                 ),
             )
@@ -164,7 +176,7 @@ def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> Fact
     if not respuesta.text:
         raise ExtraccionFallida(f"Gemini no devolvió datos ({fin or 'sin respuesta'})")
     try:
-        return FacturaExtraida.model_validate_json(respuesta.text)
+        return FacturasExtraidas.model_validate_json(respuesta.text)
     except ValueError as exc:
         raise ExtraccionFallida("La respuesta de Gemini no respeta el formato esperado; reintentar") from exc
 
@@ -172,7 +184,7 @@ def _extraer_con_gemini(contenido: bytes, media_type: str, cliente=None) -> Fact
 # ------------------------------------------------------------------ Claude (desactivado para pruebas)
 
 
-def _extraer_con_claude(contenido: bytes, media_type: str, cliente=None) -> FacturaExtraida:
+def _extraer_con_claude(contenido: bytes, media_type: str, cliente=None) -> FacturasExtraidas:
     import anthropic
 
     datos = base64.standard_b64encode(contenido).decode("ascii")
@@ -182,13 +194,14 @@ def _extraer_con_claude(contenido: bytes, media_type: str, cliente=None) -> Fact
     try:
         respuesta = cliente.beta.messages.parse(
             model=modelo(),
-            max_tokens=16000,
+            max_tokens=MAX_TOKENS_CLAUDE,
+            timeout=TIMEOUT_CLAUDE_S,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
             output_config={"effort": esfuerzo()},
             system=INSTRUCCIONES,
             messages=[{"role": "user", "content": [bloque, {"type": "text", "text": PEDIDO}]}],
-            output_format=FacturaExtraida,
+            output_format=FacturasExtraidas,
         )
     except anthropic.AuthenticationError as exc:
         raise ExtraccionNoConfigurada("La API key de Anthropic es inválida") from exc

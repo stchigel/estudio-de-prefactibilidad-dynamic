@@ -113,3 +113,11 @@ class FacturaExtraida(BaseModel):
     )
     historial: list[MesHistorial]
     notas: str = Field(description="Observaciones para quien revisa: datos ilegibles, ambigüedades, formato raro")
+
+
+class FacturasExtraidas(BaseModel):
+    """Lo que devuelve la IA por documento: un PDF puede traer una o varias facturas."""
+
+    facturas: list[FacturaExtraida] = Field(
+        description="Una entrada por cada factura del documento, en el orden en que aparecen. Nunca mezcles datos de dos facturas"
+    )
