@@ -33,7 +33,7 @@ def _textos(prs) -> list[str]:
         partes = []
         for f in _formas(slide):
             if f.has_text_frame:
-                partes.append(f.text_frame.text)
+                partes.append(f.text_frame.text.replace(chr(11), " "))  # salto de línea suave de PowerPoint
             if getattr(f, "has_table", False) and f.has_table:
                 partes += [c.text for fila in f.table.rows for c in fila.cells]
         textos.append("\n".join(partes))

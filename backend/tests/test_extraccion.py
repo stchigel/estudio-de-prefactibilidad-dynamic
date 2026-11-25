@@ -12,8 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 from extraccion.derivados import sugerir, tasas_mun_prov
-from extraccion.esquema import FacturaExtraida, Impuesto, Jurisdiccion, MesHistorial, Numero, ProvinciaCampo, Texto, TipoDocumento
-from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_factura
+from extraccion.esquema import FacturaExtraida, FacturasExtraidas, Impuesto, Jurisdiccion, MesHistorial, Numero, ProvinciaCampo, Texto, TipoDocumento
+from extraccion.extractor import ExtraccionFallida, ExtraccionNoConfigurada, extraer_facturas
 from motor.calculo import kvar_capacitores
 from motor.modelos import OrigenConsumo
 
@@ -148,6 +148,10 @@ def test_tarifa_sin_franjas_va_a_resto_y_se_marca():
     assert "factura 1: historial 09/2025" in s.campos_dudosos
 
 
+def _varias(*facturas: FacturaExtraida) -> FacturasExtraidas:
+    return FacturasExtraidas(facturas=list(facturas))
+
+
 def _cliente_falso(respuesta=None, error=None):
     def parse(**kwargs):
         parse.kwargs = kwargs
@@ -164,38 +168,52 @@ def con_claude(monkeypatch):
 
 
 def test_claude_envia_pdf_e_imagen(con_claude):
-    cliente, parse = _cliente_falso(SimpleNamespace(stop_reason="end_turn", parsed_output=factura_epe()))
-    assert extraer_factura(b"%PDF-1.4", "application/pdf", cliente).cliente_razon_social.valor == "SCIMACA S R L"
+    cliente, parse = _cliente_falso(SimpleNamespace(stop_reason="end_turn", parsed_output=_varias(factura_epe())))
+    assert extraer_facturas(b"%PDF-1.4", "application/pdf", cliente)[0].cliente_razon_social.valor == "SCIMACA S R L"
     bloque = parse.kwargs["messages"][0]["content"][0]
     assert bloque["type"] == "document" and bloque["source"]["media_type"] == "application/pdf"
-    assert parse.kwargs["output_format"] is FacturaExtraida
+    assert parse.kwargs["output_format"] is FacturasExtraidas
     assert parse.kwargs["model"] == "claude-sonnet-5-5"
-    extraer_factura(b"\xff\xd8", "image/jpeg", cliente)
+    extraer_facturas(b"\xff\xd8", "image/jpeg", cliente)
     assert parse.kwargs["messages"][0]["content"][0]["type"] == "image"
+
+
+def test_claude_devuelve_todas_las_facturas_del_pdf(con_claude):
+    doce = [factura_epe().model_copy(update={"periodo_mes": N(m)}) for m in range(1, 13)]
+    cliente, parse = _cliente_falso(SimpleNamespace(stop_reason="end_turn", parsed_output=_varias(*doce)))
+    extraidas = extraer_facturas(b"%PDF-1.4", "application/pdf", cliente)
+    assert [f.periodo_mes.valor for f in extraidas] == list(range(1, 13))
+    assert parse.kwargs["max_tokens"] >= 30000 and parse.kwargs["timeout"]  # 12 facturas = JSON largo
+
+
+def test_documento_sin_facturas_es_un_error(con_claude):
+    cliente, _ = _cliente_falso(SimpleNamespace(stop_reason="end_turn", parsed_output=_varias()))
+    with pytest.raises(ExtraccionFallida, match="ninguna factura"):
+        extraer_facturas(b"%PDF-1.4", "application/pdf", cliente)
 
 
 def test_tipo_no_soportado():
     with pytest.raises(ValueError):
-        extraer_factura(b"x", "application/zip", _cliente_falso()[0])
+        extraer_facturas(b"x", "application/zip", _cliente_falso()[0])
 
 
 def test_claude_sin_credenciales(con_claude):
     error = TypeError("Could not resolve authentication method. Expected one of api_key...")
     with pytest.raises(ExtraccionNoConfigurada):
-        extraer_factura(b"%PDF", "application/pdf", _cliente_falso(error=error)[0])
+        extraer_facturas(b"%PDF", "application/pdf", _cliente_falso(error=error)[0])
 
 
 def test_claude_rechazo_o_respuesta_incompleta(con_claude):
     for r in (SimpleNamespace(stop_reason="refusal", parsed_output=None),
               SimpleNamespace(stop_reason="max_tokens", parsed_output=None)):
         with pytest.raises(ExtraccionFallida):
-            extraer_factura(b"%PDF", "application/pdf", _cliente_falso(r)[0])
+            extraer_facturas(b"%PDF", "application/pdf", _cliente_falso(r)[0])
 
 
 def test_proveedor_desconocido(monkeypatch):
     monkeypatch.setenv("EXTRACCION_PROVEEDOR", "otro")
     with pytest.raises(ExtraccionNoConfigurada):
-        extraer_factura(b"%PDF", "application/pdf", _cliente_falso()[0])
+        extraer_facturas(b"%PDF", "application/pdf", _cliente_falso()[0])
 
 
 # ------------------------------------------------------------------ Gemini (proveedor por defecto)
@@ -218,13 +236,13 @@ def con_gemini(monkeypatch):
 
 
 def test_gemini_es_el_proveedor_por_defecto_y_valida_el_esquema(con_gemini):
-    cliente, llamada = _gemini_falso(factura_epe().model_dump_json())
-    f = extraer_factura(b"%PDF-1.4", "application/pdf", cliente)
+    cliente, llamada = _gemini_falso(_varias(factura_epe()).model_dump_json())
+    f = extraer_facturas(b"%PDF-1.4", "application/pdf", cliente)[0]
     assert f.cliente_razon_social.valor == "SCIMACA S R L"
     assert llamada.kwargs["model"] == "gemini-3.5-flash"
     config = llamada.kwargs["config"]
     assert config.response_mime_type == "application/json"
-    assert config.response_json_schema == FacturaExtraida.model_json_schema()
+    assert config.response_json_schema == FacturasExtraidas.model_json_schema()
     documento = llamada.kwargs["contents"][0]
     assert documento.inline_data.mime_type == "application/pdf"
 
@@ -233,7 +251,7 @@ def test_gemini_sin_key(con_gemini, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     with pytest.raises(ExtraccionNoConfigurada, match="GEMINI_API_KEY"):
-        extraer_factura(b"%PDF", "application/pdf")
+        extraer_facturas(b"%PDF", "application/pdf")
 
 
 def test_gemini_errores(con_gemini):
@@ -241,15 +259,15 @@ def test_gemini_errores(con_gemini):
 
     cuota = errors.ClientError(429, {"error": {"code": 429, "message": "Quota exceeded", "status": "RESOURCE_EXHAUSTED"}})
     with pytest.raises(ExtraccionFallida, match="por minuto"):
-        extraer_factura(b"%PDF", "application/pdf", _gemini_falso(error=cuota)[0])
+        extraer_facturas(b"%PDF", "application/pdf", _gemini_falso(error=cuota)[0])
     key = errors.ClientError(400, {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT",
                                              "details": [{"reason": "API_KEY_INVALID"}]}})
     with pytest.raises(ExtraccionNoConfigurada):
-        extraer_factura(b"%PDF", "application/pdf", _gemini_falso(error=key)[0])
+        extraer_facturas(b"%PDF", "application/pdf", _gemini_falso(error=key)[0])
     with pytest.raises(ExtraccionFallida, match="incompleta"):
-        extraer_factura(b"%PDF", "application/pdf", _gemini_falso("{", fin="MAX_TOKENS")[0])
+        extraer_facturas(b"%PDF", "application/pdf", _gemini_falso("{", fin="MAX_TOKENS")[0])
     with pytest.raises(ExtraccionFallida, match="formato"):
-        extraer_factura(b"%PDF", "application/pdf", _gemini_falso('{"tipo_documento": "x"}')[0])
+        extraer_facturas(b"%PDF", "application/pdf", _gemini_falso('{"tipo_documento": "x"}')[0])
 
 
 # ------------------------------------------------------------------ con la API real (solo si hay key)
@@ -269,7 +287,7 @@ hay_credenciales = pytest.mark.skipif(not _hay_credenciales(), reason="Pruebas c
 
 @hay_credenciales
 def test_extraccion_real_epe():
-    f = extraer_factura((EJEMPLOS / "07-2026.pdf").read_bytes(), "application/pdf")
+    f = extraer_facturas((EJEMPLOS / "07-2026.pdf").read_bytes(), "application/pdf")[0]
     assert f.provincia.valor == "Santa Fe"
     assert f.kwh_resto.valor == pytest.approx(15150.6, rel=1e-3)
     assert tasas_mun_prov(f) == pytest.approx(0.099)
@@ -278,7 +296,7 @@ def test_extraccion_real_epe():
 
 @hay_credenciales
 def test_extraccion_real_edenor_escaneada():
-    f = extraer_factura((EJEMPLOS / "edenor Santamaria vto 24-08-26.pdf").read_bytes(), "application/pdf")
+    f = extraer_facturas((EJEMPLOS / "edenor Santamaria vto 24-08-26.pdf").read_bytes(), "application/pdf")[0]
     assert f.tipo_documento == TipoDocumento.DISTRIBUIDORA
     assert f.kwh_total.valor or f.kwh_resto.valor
 
@@ -292,17 +310,17 @@ def test_gemini_pasa_al_modelo_de_respaldo_si_esta_sobrecargado(con_gemini):
         usados.append(kwargs["model"])
         if kwargs["model"] == "gemini-3.5-flash":
             raise errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
-        return SimpleNamespace(text=factura_epe().model_dump_json(), candidates=[SimpleNamespace(finish_reason="STOP")])
+        return SimpleNamespace(text=_varias(factura_epe()).model_dump_json(), candidates=[SimpleNamespace(finish_reason="STOP")])
 
     cliente = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
-    assert extraer_factura(b"%PDF", "application/pdf", cliente).cliente_razon_social.valor == "SCIMACA S R L"
+    assert extraer_facturas(b"%PDF", "application/pdf", cliente)[0].cliente_razon_social.valor == "SCIMACA S R L"
     assert usados == ["gemini-3.5-flash", "gemini-3.1-flash-lite"]
 
     def siempre_503(**kwargs):
         raise errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
 
     with pytest.raises(ExtraccionFallida, match="todos los modelos"):
-        extraer_factura(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=siempre_503)))
+        extraer_facturas(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=siempre_503)))
 
 
 def test_gemini_cupo_diario_agotado_pasa_al_respaldo(con_gemini):
@@ -317,5 +335,5 @@ def test_gemini_cupo_diario_agotado_pasa_al_respaldo(con_gemini):
         raise errors.ClientError(429, diario)
 
     with pytest.raises(ExtraccionFallida, match="cupo diario"):
-        extraer_factura(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
+        extraer_facturas(b"%PDF", "application/pdf", SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
     assert usados == ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]

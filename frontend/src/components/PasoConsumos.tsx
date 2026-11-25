@@ -35,6 +35,13 @@ const FRANJAS = { valle: "Valle", resto: "Resto", pico: "Pico" } as const;
 
 const ETIQUETA_ORIGEN: Record<OrigenConsumo, string> = { factura: "factura", historial: "historial", estimado: "estimado", manual: "manual" };
 
+/** Un mismo PDF puede traer varias facturas: el período las distingue en el selector. */
+function rotuloFactura(f: RespuestaExtraccion["facturas"][number]): string {
+  const { periodo_mes: mes, periodo_anio: anio } = f.datos;
+  if (!mes.valor || !anio.valor) return f.archivo;
+  return `${f.archivo} — ${String(mes.valor).padStart(2, "0")}/${anio.valor}`;
+}
+
 /** Resumen de la tabla: los mismos datos, totalizados para revisarlos de un vistazo. */
 function ResumenConsumos({ consumos }: { consumos: ConsumoMensual[] }) {
   const totales = consumos.map((c) => c.valle + c.resto + c.pico);
@@ -264,7 +271,7 @@ export function PasoConsumos({
                   >
                     {extraccion.facturas.map((f, i) => (
                       <option key={i} value={i}>
-                        {f.archivo}
+                        {rotuloFactura(f)}
                       </option>
                     ))}
                   </Selector>

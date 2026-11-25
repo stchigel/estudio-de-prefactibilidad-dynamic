@@ -44,14 +44,12 @@ volver a correr también `scripts/extraer_parametros.py`.
 ## Plantilla del PowerPoint (§10.2)
 
 El generador (`exportes/powerpoint.py`) completa `exportes/plantillas/prefactibilidad.pptx`,
-una copia de la plantilla del equipo con marcas `{{...}}` en lugar de los "xxx". Esa copia
-se arma con:
+que se edita directamente en PowerPoint (formato, posiciones, fuentes). Al editarla hay que
+conservar:
 
-```bash
-.venv/Scripts/python scripts/preparar_plantilla_ppt.py "ruta/a/Presentación prefactibilidad SOLAR.pptx"
-```
+- las marcas `{{nombre}}` de texto, dentro de un mismo run;
+- el prefijo `[[si:<condición>]]` de los párrafos condicionales;
+- los nombres de forma `IMG:`, `TABLA:`, `GRAFICO:`, `ETIQUETA:`, `COND:` y `COND_FORMA:`.
 
-Cuando el equipo mande una plantilla nueva, correr el script con ella: si algún texto
-esperado cambió, falla indicando cuál, y hay que ajustar el script. Para revisar el
-resultado conviene abrir una presentación generada en PowerPoint (los tests verifican
-contenido, no la disposición visual).
+Para revisar el resultado conviene abrir una presentación generada en PowerPoint (los tests
+verifican contenido, no la disposición visual).

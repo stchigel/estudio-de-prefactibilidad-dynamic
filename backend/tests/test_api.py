@@ -75,7 +75,7 @@ def test_extraer_sin_credenciales_responde_503(monkeypatch):
     def falla(*_):
         raise m.ExtraccionNoConfigurada("Falta configurar ANTHROPIC_API_KEY")
 
-    monkeypatch.setattr(m, "extraer_factura", falla)
+    monkeypatch.setattr(m, "extraer_facturas", falla)
     r = cliente.post("/api/facturas/extraer", files=[("archivos", ("f.pdf", b"%PDF", "application/pdf"))])
     assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
 
@@ -84,11 +84,24 @@ def test_extraer_devuelve_sugerencias(monkeypatch):
     import api.main as m
     from test_extraccion import factura_epe
 
-    monkeypatch.setattr(m, "extraer_factura", lambda *_: factura_epe())
+    monkeypatch.setattr(m, "extraer_facturas", lambda *_: [factura_epe()])
     r = cliente.post("/api/facturas/extraer", files=[("archivos", ("07-2026.pdf", b"%PDF", "application/pdf"))])
     assert r.status_code == 200, r.text
     s = r.json()["sugerencias"]
     assert s["provincia"] == "Santa Fe" and s["potencia_contratada_kw"] == 120
+
+
+def test_extraer_un_pdf_con_varias_facturas(monkeypatch):
+    import api.main as m
+    from test_extraccion import N, factura_epe
+
+    doce = [factura_epe().model_copy(update={"periodo_mes": N(mes)}) for mes in range(1, 13)]
+    monkeypatch.setattr(m, "extraer_facturas", lambda *_: doce)
+    r = cliente.post("/api/facturas/extraer", files=[("archivos", ("año.pdf", b"%PDF", "application/pdf"))])
+    assert r.status_code == 200, r.text
+    facturas = r.json()["facturas"]
+    assert [f["datos"]["periodo_mes"]["valor"] for f in facturas] == list(range(1, 13))
+    assert {f["archivo"] for f in facturas} == {"año.pdf"}
 
 
 def test_exportar_ppt():

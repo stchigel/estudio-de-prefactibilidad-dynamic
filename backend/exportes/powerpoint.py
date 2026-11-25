@@ -1,7 +1,7 @@
 """Generación de la presentación de la propuesta (§10.2).
 
 Completa la plantilla con marcas (exportes/plantillas/prefactibilidad.pptx, ver
-scripts/preparar_plantilla_ppt.py) conservando el diseño: textos, tablas,
+backend/README.md) conservando el diseño: textos, tablas,
 gráficos nativos, imágenes y diapositivas condicionales.
 """
 
@@ -441,6 +441,7 @@ def _tabla_consumos(slide, d: DatosPpt) -> None:
             for p in celda.text_frame.paragraphs:
                 for r in p.runs:
                     r.font.size = Pt(11)
+                    r.font.name = "Helvetica"
 
 
 def _grafico_roi(slide, d: DatosPpt) -> None:
