@@ -34,8 +34,6 @@ FILAS_OPCIONES_PLANTILLA = 6  # filas de datos que entran con el tamaño origina
 ALTO_DISPONIBLE_FILAS = 2_350_000  # EMU entre el encabezado de la tabla y la nota al pie
 COLOR_AHORRO_NETO = "2B231E"  # tinta de la plantilla: la línea se distingue de las barras
 RESALTADO_RECOMENDADA = RGBColor(0xFD, 0xE4, 0xE4)  # rojo muy claro, acorde a la marca
-# Párrafos condicionales que se vacían en lugar de quitarse, para no desalinear íconos.
-VACIAR_EN_LUGAR_DE_QUITAR = {"capacitores"}
 
 
 @dataclass(frozen=True)
@@ -253,7 +251,6 @@ def _condiciones(d: DatosPpt) -> dict[str, bool]:
         "financiacion": d.entradas.financiacion.porcentaje > 0,
         "bancaria": bool(d.texto_bancario and d.texto_bancario.strip()),
         "cfi": bool(d.texto_cfi and d.texto_cfi.strip()),
-        "capacitores": d.entradas.banco_capacitores,
         "meses_estimados": any(c.origen == OrigenConsumo.ESTIMADO for c in d.entradas.consumos),
     }
 
@@ -304,11 +301,7 @@ def _completar_textos(slide, valores: dict[str, str], condiciones: dict[str, boo
         if m:
             runs[0].text = runs[0].text[m.end() :]
             if not condiciones[m.group(1)]:
-                if m.group(1) in VACIAR_EN_LUGAR_DE_QUITAR:
-                    for r in runs:
-                        r.text = ""
-                else:
-                    parrafo._p.getparent().remove(parrafo._p)
+                parrafo._p.getparent().remove(parrafo._p)
                 continue
         for i, r in enumerate(runs):
             if "{{" in r.text:

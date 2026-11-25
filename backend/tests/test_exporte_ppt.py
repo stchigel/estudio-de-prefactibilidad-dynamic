@@ -92,7 +92,8 @@ def test_numeros_del_proyecto(simple):
 def test_parrafos_condicionales(simple):
     e, r = simple
     _, textos = _generar(DatosPpt(e, r))
-    assert "factor de potencia" not in textos[2]  # sin banco de capacitores
+    # La corrección del factor de potencia va siempre: los inversores fotovoltaicos ya la mejoran.
+    assert "factor de potencia" in textos[2]
     assert "meses no" not in textos[1]  # sin meses estimados
     c = list(e.consumos)
     c[1] = replace(c[1], origen=OrigenConsumo.ESTIMADO)
