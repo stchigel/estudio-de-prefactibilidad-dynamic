@@ -116,11 +116,15 @@ def test_financiacion_semestral():
     anticipo = r.inversion.total_usd - f.monto_financiado
     assert f.pagos_semestrales[0] - f.pagos_semestrales[1] == pytest.approx(anticipo)
     assert f.ahorros_semestrales == [pytest.approx(r.economia.ahorro_anual_usd / 2)] * 14
-    # Ahorro neto acumulado = Σ(ahorros − pagos): arranca negativo por el anticipo y termina
-    # en ahorros totales menos pagos totales.
-    assert f.ahorro_neto_acumulado_semestral[0] == pytest.approx(f.ahorros_semestrales[0] - f.pagos_semestrales[0])
-    assert f.ahorro_neto_acumulado_semestral[0] < 0
-    assert f.ahorro_neto_acumulado_semestral[-1] == pytest.approx(7 * r.economia.ahorro_anual_usd - sum(f.pagos))
+    # Ahorro neto acumulado = Σ(ahorros − pagos), sin bajar de cero: mientras el anticipo no se
+    # recupera vale 0; termina en ahorros totales menos pagos totales.
+    neto, esperado = f.ahorro_neto_acumulado_semestral, 0.0
+    for i, (a, p) in enumerate(zip(f.ahorros_semestrales, f.pagos_semestrales)):
+        esperado += a - p
+        assert neto[i] == pytest.approx(max(0.0, esperado))
+    assert neto[0] == 0  # el anticipo del primer semestre supera al ahorro
+    assert all(x >= 0 for x in neto)
+    assert neto[-1] == pytest.approx(max(0.0, 7 * r.economia.ahorro_anual_usd - sum(f.pagos)))
 
 
 def test_varios_anios_de_gracia():

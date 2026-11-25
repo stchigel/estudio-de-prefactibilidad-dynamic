@@ -342,7 +342,7 @@ Se recomienda aplicar también #2 en la planilla para que el Excel exportado coi
 ## 8. Panel de resultados
 
 - **KPIs**: potencia, inversión, generación, cobertura, autoconsumo, superficie (vs. disponible), ahorro anual, ROI, TIR, VAN.
-- **Gráficos**: consumo vs. generación mensual; curva de ROI (capital acumulado); cash flow de financiación **semestral** (pagos y ahorros en barras, ahorro neto acumulado —ahorros menos pagos— en línea, 7 años); comparación de opciones.
+- **Gráficos**: consumo vs. generación mensual; curva de ROI (capital acumulado); cash flow de financiación **semestral** (pagos y ahorros en barras, ahorro neto acumulado —ahorros menos pagos, sin bajar de cero— en línea, 7 años); comparación de opciones.
 - **Sensibilidad rápida**: dólar, tasa de descuento, inhibición, baterías → recálculo inmediato.
 - **Alertas**: superficie insuficiente, potencia sobre contratada, meses estimados, validaciones de baterías.
 
